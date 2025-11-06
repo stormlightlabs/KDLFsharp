@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "KDLFSharp.CLI", "KDLFSharp.CLI\KDLFSharp.CLI.fsproj", "{97CF7FD0-308E-4B92-A73A-8781DDEFA276}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "KDLFSharp.Core", "KDLFSharp.Core\KDLFSharp.Core.fsproj", "{7B1625F3-C24F-43CC-88A9-B1AC38A7F453}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{97CF7FD0-308E-4B92-A73A-8781DDEFA276}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97CF7FD0-308E-4B92-A73A-8781DDEFA276}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{97CF7FD0-308E-4B92-A73A-8781DDEFA276}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{97CF7FD0-308E-4B92-A73A-8781DDEFA276}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B1625F3-C24F-43CC-88A9-B1AC38A7F453}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B1625F3-C24F-43CC-88A9-B1AC38A7F453}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B1625F3-C24F-43CC-88A9-B1AC38A7F453}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B1625F3-C24F-43CC-88A9-B1AC38A7F453}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

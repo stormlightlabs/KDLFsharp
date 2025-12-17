@@ -232,7 +232,7 @@ let whitespaceTests =
               let props = propMap node
 
               match Map.tryFind "open" props with
-              | Some(Value.Boolean true) -> ()
+              | Some(Value.Boolean(true, _)) -> ()
               | other -> failtestf "Expected open property, got %A" other
           }
 
@@ -247,7 +247,7 @@ let whitespaceTests =
               | other -> failtestf "Expected name property, got %A" other
 
               match Map.tryFind "open" props with
-              | Some(Value.Boolean true) -> ()
+              | Some(Value.Boolean(true, _)) -> ()
               | other -> failtestf "Expected open=#true, got %A" other
           }
 
@@ -265,32 +265,68 @@ let whitespaceTests =
           test "B08: After a slashdashed children block, only children blocks may follow" {
               let input = "park \"Zilker\" /- { a } note \"nope\""
               expectParseError input
+          }
+
+          test "B09: Property blocks may span newlines without continuations" {
+              let node =
+                  parseSingleNode
+                      "dataset \"parks\"\n    version=\"1.0\"\n    generated_at=(date)\"2025-01-01\""
+
+              let props = propMap node
+              Expect.sequenceEqual (node.Arguments |> List.map stringOfValue) [ "parks" ] "argument preserved"
+
+              match Map.tryFind "version" props with
+              | Some(Value.String("1.0", _)) -> ()
+              | other -> failtestf "Expected version property, got %A" other
+
+              match Map.tryFind "generated_at" props with
+              | Some(Value.String("2025-01-01", Some "date")) -> ()
+              | other -> failtestf "Expected typed date property, got %A" other
           } ]
 
 [<Tests>]
 let lineContinuationTests =
     testList
         "C. Line continuation (backslash-escaped newline)"
-        [ ptestCase "C01: Line continuation across newline"
-          <| fun () ->
-              // INPUT: park "Zilker"\\\nopen=#true
-              // EXPECTED: park.args = ["Zilker"], park.props.open = #true
-              // TODO: Backslash line continuation not implemented in lexer
-              skiptest "Line continuation not implemented"
+        [ test "C01: Line continuation across newline" {
+              let input = "park \"Zilker\"\\\nopen=#true"
+              let node = parseSingleNode input
 
-          ptestCase "C02: Line continuation allows comments after backslash"
-          <| fun () ->
-              // INPUT: park "Pease" \\ // continue entries on next line\nopen=#true
-              // EXPECTED: args=["Pease"], props.open=#true
-              // TODO: Backslash line continuation not implemented in lexer
-              skiptest "Line continuation not implemented"
+              match node.Arguments with
+              | [ Value.String(arg, _) ] -> Expect.equal arg "Zilker" "argument on continued line preserved"
+              | other -> failtestf "Unexpected arguments %A" other
 
-          ptestCase "C03: Line continuation may include multiline comments between \\ and newline"
-          <| fun () ->
-              // INPUT: park "Walnut Creek" \\ /* ok */\nopen=#true
-              // EXPECTED: props.open=#true
-              // TODO: Backslash line continuation not implemented in lexer
-              skiptest "Line continuation not implemented" ]
+              let props = propMap node
+
+              match Map.tryFind "open" props with
+              | Some(Value.Boolean(true, _)) -> ()
+              | other -> failtestf "Expected open=#true, got %A" other
+          }
+
+          test "C02: Line continuation allows comments after backslash" {
+              let input = "park \"Pease\" \\ // continue entries on next line\nopen=#true"
+              let node = parseSingleNode input
+
+              match node.Arguments with
+              | [ Value.String(arg, _) ] -> Expect.equal arg "Pease" "argument preserved"
+              | other -> failtestf "Unexpected arguments %A" other
+
+              let props = propMap node
+
+              match Map.tryFind "open" props with
+              | Some(Value.Boolean(true, _)) -> ()
+              | other -> failtestf "Expected open property, got %A" other
+          }
+
+          test "C03: Line continuation may include multiline comments between \\ and newline" {
+              let input = "park \"Walnut Creek\" \\ /* ok */\nopen=#true"
+              let node = parseSingleNode input
+              let props = propMap node
+
+              match Map.tryFind "open" props with
+              | Some(Value.Boolean(true, _)) -> ()
+              | other -> failtestf "Expected open property, got %A" other
+          } ]
 
 [<Tests>]
 let propertiesAndArgumentsTests =
@@ -350,17 +386,31 @@ let typeAnnotationTests =
               | other -> failtestf "Unexpected arguments %A" other
           }
 
-          ptestCase "E02: Type annotation on a value"
-          <| fun () ->
-              // INPUT: distance (f32)3.1 unit="miles"
-              // EXPECTED: distance.args = [(type="f32", value=3.1)], props.unit="miles"
-              skiptest "TODO"
+          test "E02: Type annotation on a value" {
+              let node = parseSingleNode "distance (f32)3.1 unit=\"miles\""
 
-          ptestCase "E03: Whitespace allowed inside and around type annotation"
-          <| fun () ->
-              // INPUT: (  published  )  date  "1970-01-01"
-              // EXPECTED: same as E01
-              skiptest "TODO"
+              match node.Arguments with
+              | [ Value.Number(lit, ty) ] ->
+                  Expect.equal ty (Some "f32") "type annotation carried to value"
+                  Expect.equal lit.Raw "3.1" "numeric literal preserved"
+              | other -> failtestf "Unexpected args %A" other
+
+              let props = propMap node
+
+              match Map.tryFind "unit" props with
+              | Some(Value.String("miles", _)) -> ()
+              | other -> failtestf "Expected unit property, got %A" other
+          }
+
+          test "E03: Whitespace allowed inside and around type annotation" {
+              let node = parseSingleNode "(  published  )  date  \"1970-01-01\""
+              Expect.equal node.Name "date" "node name preserved"
+              Expect.equal node.TypeAnn (Some "published") "type annotation trimmed"
+
+              match node.Arguments with
+              | [ Value.String(value, _) ] -> Expect.equal value "1970-01-01" "argument captured"
+              | other -> failtestf "Unexpected args %A" other
+          }
 
           test "E04: Slashdash can appear before a type annotation it is commenting out" {
               let node = parseSingleNode "park /- (tag)\"experimental\" open=#true"
@@ -368,7 +418,7 @@ let typeAnnotationTests =
               let props = propMap node
 
               match Map.tryFind "open" props with
-              | Some(Value.Boolean true) -> ()
+              | Some(Value.Boolean(true, _)) -> ()
               | other -> failtestf "Expected open=#true, got %A" other
           } ]
 
@@ -376,9 +426,34 @@ let typeAnnotationTests =
 let stringTests =
     testList
         "F. Strings (identifier, quoted, multiline, raw) + escapes"
-        [ ptestCase "F01: Identifier string node name" <| fun () -> skiptest "TODO"
+        [ test "F01: Identifier string node name" {
+              let node = parseSingleNode "my-node 1 2"
+              Expect.equal node.Name "my-node" "node name captured"
 
-          ptestCase "F02: Quoted string node name (spaces)" <| fun () -> skiptest "TODO"
+              match node.Arguments with
+              | [ Value.Number(lit1, _); Value.Number(lit2, _) ] ->
+                  Expect.equal lit1.Raw "1" "first arg"
+                  Expect.equal lit2.Raw "2" "second arg"
+              | other -> failtestf "Unexpected args %A" other
+          }
+
+          test "F02: Quoted string node name (spaces)" {
+              let node = parseSingleNode "\"park listing\" \"Zilker\""
+              Expect.equal node.Name "park listing" "quoted node name preserved"
+
+              match node.Arguments with
+              | [ Value.String(arg, _) ] -> Expect.equal arg "Zilker" "argument captured"
+              | other -> failtestf "Unexpected args %A" other
+          }
+
+          test "F02a: Quoted string property key" {
+              let node = parseSingleNode "park \"Zilker\" \"curator notes\"=\"Beloved park\""
+              let props = propMap node
+
+              match Map.tryFind "curator notes" props with
+              | Some(Value.String(value, _)) -> Expect.equal value "Beloved park" "quoted key stored"
+              | other -> failtestf "Expected quoted-key property, got %A" other
+          }
 
           test "F03: Identifier strings cannot contain forbidden punctuation" { expectParseError "zilker#park" }
 
@@ -508,13 +583,13 @@ let booleanAndNullTests =
               let node = parseSingleNode "flags #true enabled=#false"
 
               match node.Arguments with
-              | Value.Boolean true :: _ -> ()
+              | Value.Boolean(true, _) :: _ -> ()
               | other -> failtestf "Expected boolean arg, got %A" other
 
               let props = propMap node
 
               match Map.tryFind "enabled" props with
-              | Some(Value.Boolean false) -> ()
+              | Some(Value.Boolean(false, _)) -> ()
               | other -> failtestf "Expected enabled=#false, got %A" other
           }
 
@@ -522,13 +597,13 @@ let booleanAndNullTests =
               let node = parseSingleNode "maybe #null value=#null"
 
               match node.Arguments with
-              | Value.Null :: _ -> ()
+              | Value.Null _ :: _ -> ()
               | other -> failtestf "Expected #null argument, got %A" other
 
               let props = propMap node
 
               match Map.tryFind "value" props with
-              | Some Value.Null -> ()
+              | Some(Value.Null _) -> ()
               | other -> failtestf "Expected value=#null, got %A" other
           } ]
 
@@ -571,7 +646,7 @@ let childrenBlockTests =
               let props = propMap node
 
               match Map.tryFind "open" props with
-              | Some(Value.Boolean true) -> ()
+              | Some(Value.Boolean(true, _)) -> ()
               | other -> failtestf "Expected open property, got %A" other
           }
 

@@ -59,16 +59,16 @@ and SpecialNumberKind =
 and Value =
     | String of string * TypeAnnotation option
     | Number of NumberLiteral * TypeAnnotation option
-    | Boolean of bool
-    | Null
+    | Boolean of bool * TypeAnnotation option
+    | Null of TypeAnnotation option
     | NodeValue of Node list * TypeAnnotation option // for future expansion (child blocks as values)
 
     override this.ToString() =
         match this with
         | String(s, _) -> $"\"%s{s}\""
         | Number(lit, _) -> lit.Raw
-        | Boolean b -> if b then "#true" else "#false"
-        | Null -> "#null"
+        | Boolean(b, _) -> if b then "#true" else "#false"
+        | Null _ -> "#null"
         | NodeValue _ -> "{…}"
 
 module NumberLiteral =
@@ -154,8 +154,8 @@ module Builder =
     let str s = String(s, None)
     let typedStr ty s = String(s, Some ty)
     let num s = Number(NumberLiteral.ofRaw s, None)
-    let bool b = Boolean b
-    let nullv = Null
+    let bool b = Boolean(b, None)
+    let nullv = Null None
 
     let prop key value = { Key = key; Value = value }
 

@@ -93,10 +93,8 @@
             kind="Metropolitan"
             off_leash_area=#true
             off_leash_source="offleash_list"
-        {
             // A key with spaces (string keys are allowed)
             "curator notes"="Major central park; acres/address from City directory."
-        }
 
         park id="emma-long-metro"
             name="Emma Long Metropolitan Park"

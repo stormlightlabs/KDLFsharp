@@ -1,0 +1,20 @@
+/- kdl-version 2
+(meta)dataset "sample-library" version="1.0.0" generated_at=(date)"2024-01-01" {
+    libraries source="apl_branches" system="Austin Public Library" {
+        branch id="yarborough"
+            name="Yarborough Branch"
+            phone="512-974-8820"
+            address="2200 Hancock Dr."
+        {
+            hours {
+                day "Sunday"    closed=#true
+                day "Monday"    open="09:00" close="20:00"
+                day "Tuesday"   open="09:00" close="20:00"
+                day "Wednesday" open="09:00" close="20:00"
+                day "Thursday"  open="09:00" close="20:00"
+                day "Friday"    open="09:00" close="17:00"
+                day "Saturday"  open="10:00" close="17:00"
+            }
+        }
+    }
+}

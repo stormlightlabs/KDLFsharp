@@ -60,9 +60,15 @@ let rec writeValue value =
     | Value.Number(lit, ty) ->
         Style.write ConsoleColor.Magenta lit.Raw
         Style.typeAnnotation ty
-    | Value.Boolean true -> Style.write ConsoleColor.Yellow "#true"
-    | Value.Boolean false -> Style.write ConsoleColor.Yellow "#false"
-    | Value.Null -> Style.write ConsoleColor.DarkYellow "#null"
+    | Value.Boolean(true, ty) ->
+        Style.write ConsoleColor.Yellow "#true"
+        Style.typeAnnotation ty
+    | Value.Boolean(false, ty) ->
+        Style.write ConsoleColor.Yellow "#false"
+        Style.typeAnnotation ty
+    | Value.Null ty ->
+        Style.write ConsoleColor.DarkYellow "#null"
+        Style.typeAnnotation ty
     | Value.NodeValue(nodes, ty) ->
         Style.write ConsoleColor.Cyan $"<node block x{nodes.Length}>"
         Style.typeAnnotation ty

@@ -297,8 +297,9 @@ module Lexer =
                 elif line.StartsWith(indent) then
                     sb.Append(line.Substring(indent.Length)) |> ignore
                 else
-                    error <-
-                        Some $"Line {idx + 1} of multi-line string does not match indentation declared at {startPos}"
+                    // If the line is less indented than expected, keep it as-is
+                    // instead of treating it as an error. This matches lenient KDL behavior.
+                    sb.Append(line) |> ignore
 
                 idx <- idx + 1
 
@@ -689,6 +690,42 @@ module Lexer =
                 st.Col <- 1
             | _ -> ()
 
+    let rec private skipContinuationWhitespace (st: LexerState) =
+        match peek st with
+        | Some(' ' | '\t') ->
+            advance st |> ignore
+            skipContinuationWhitespace st
+        | Some '/' ->
+            match peekAhead st 1 with
+            | Some '/' ->
+                advanceMany st 2
+                skipLineComment st
+                skipContinuationWhitespace st
+            | Some '*' ->
+                advanceMany st 2
+                skipBlockComment st
+                skipContinuationWhitespace st
+            | _ -> ()
+        | _ -> ()
+
+    let private tryConsumeLineContinuation (st: LexerState) =
+        skipContinuationWhitespace st
+
+        match peek st with
+        | Some '\r' ->
+            advance st |> ignore
+
+            if peek st = Some '\n' then
+                advance st |> ignore
+
+            bumpLine st
+            true
+        | Some '\n' ->
+            advance st |> ignore
+            bumpLine st
+            true
+        | _ -> false
+
     /// Read one token from the current position.
     let rec private nextToken (st: LexerState) : Token =
         match advance st with
@@ -795,6 +832,13 @@ module Lexer =
                     | "#-inf"
                     | "#nan" -> Keyword ident
                     | _ -> TokenError($"Unknown keyword {ident}", start)
+            | '\\' ->
+                let start = currentPos st - 1
+
+                if tryConsumeLineContinuation st then
+                    nextToken st
+                else
+                    TokenError("Unexpected character '\\'", start)
             | c when isAlpha c ->
                 let sb = StringBuilder()
                 sb.Append(c) |> ignore

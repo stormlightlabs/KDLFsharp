@@ -1,0 +1,13 @@
+/- kdl-version 2
+(meta)dataset "sample-park" version="1.0.0" generated_at=(date)"2024-01-01" {
+    parks source="parks_directory" city="Austin" state="TX" {
+        park id="zilker-metro"
+            name="Zilker Metropolitan Park"
+            address="2100 Barton Springs Rd., Austin, Texas 78746"
+            acres=(f64)274.6150
+            kind="Metropolitan"
+            off_leash_area=#true
+            off_leash_source="offleash_list"
+            note="Beloved central park."
+    }
+}

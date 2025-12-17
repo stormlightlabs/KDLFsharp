@@ -1,0 +1,23 @@
+// Minimal Zellij layout/config sample to exercise parser features.
+/- kdl-version 2
+layout "dashboard" {
+    pane name="editor" command="nvim" cwd="~/Projects"
+
+    pane split_direction="Vertical" size=0.4 {
+        pane name="processes" command="htop"
+        pane name="shell" command="bash" args="--login"
+    }
+
+    tabs {
+        tab name="Logs" focus=true template="log-viewer"
+        tab name="Git" template="git-status"
+    }
+}
+
+keybinds clear-defaults=#true {
+    bind key="Ctrl g" action="GoToNextTab"
+    bind key="Ctrl p" action="GoToPreviousTab"
+    bind key="Ctrl s" action="ToggleFloatingPanes"
+}
+
+theme "TokyoNight" source="~/.config/zellij/themes/tokyo-night.kdl"

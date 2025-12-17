@@ -27,9 +27,16 @@ module private Stream =
 type ParseResult<'a> = Result<'a, AstError list>
 
 module Parser =
+    let rec private skipTrivialTokens (ts: TokenStream) =
+        match Stream.current ts with
+        | Newline
+        | Semicolon ->
+            Stream.advance ts
+            skipTrivialTokens ts
+        | _ -> ()
+
     let rec private parseDocument (ts: TokenStream) : Node list * AstError list = parseNodes ts []
 
-    /// TODO: implement spec-accurate skipping of slashdashed nodes/children/props
     and private parseNodes (ts: TokenStream) (acc: Node list) : Node list * AstError list =
         match Stream.current ts with
         | Eof
@@ -41,15 +48,18 @@ module Parser =
             Stream.advance ts
             parseNodes ts acc
         | SlashDash ->
-
             Stream.advance ts
-            let _ = parseOneNode ts
-            parseNodes ts acc
+            skipTrivialTokens ts
+            let _, skipErrs = parseOneNode ts
+            let nodes, restErrs = parseNodes ts acc
+            (nodes, skipErrs @ restErrs)
         | _ ->
             let nodeRes, errs = parseOneNode ts
 
             match nodeRes with
-            | Some n -> parseNodes ts (n :: acc |> List.rev |> List.rev)
+            | Some n ->
+                let nodes, restErrs = parseNodes ts (n :: acc)
+                (nodes, errs @ restErrs)
             | None -> (List.rev acc, errs)
 
     and private parseOneNode (ts: TokenStream) : Node option * AstError list =
@@ -60,7 +70,7 @@ module Parser =
         match Stream.current ts with
         | Ident name ->
             Stream.advance ts
-            let args, props, entryErrs = parseEntries ts [] []
+            let args, props, entryErrs = parseEntries ts [] [] false
             errors <- errors @ entryErrs
             let children, childErrs = parseOptChildren ts
             errors <- errors @ childErrs
@@ -71,11 +81,13 @@ module Parser =
                   Name = name
                   Arguments = args
                   Properties = props
-                  Children = children }
+                  Children = children
+                  Span = None
+                  OriginalText = None }
 
             Some node, errors
         | tok ->
-            let err = AstError.UnexpectedValue $"Expected node name, found %A{tok}"
+            let err = AstError.unexpectedValue $"Expected node name, found %A{tok}"
             Stream.advance ts
             None, (err :: errors)
 
@@ -94,17 +106,15 @@ module Parser =
                     (Some t, [])
                 | other ->
                     Stream.advance ts
-                    (Some t, [ AstError.InvalidTypeAnnotation $"Expected ')', found %A{other}" ])
+                    (Some t, [ AstError.invalidTypeAnnotation $"Expected ')', found %A{other}" ])
             | other ->
                 Stream.advance ts
 
-                (None, [ AstError.InvalidTypeAnnotation $"Expected type name, found %A{other}" ])
+                (None, [ AstError.invalidTypeAnnotation $"Expected type name, found %A{other}" ])
         | _ -> (None, [])
 
     /// entries := (prop | arg | slashdash)* until { or newline or ; or } or eof
-    ///
-    /// TODO: implement slashdash-on-entry exactly like spec (whole prop/arg/children)
-    and private parseEntries (ts: TokenStream) (argsAcc: Value list) (propsAcc: Property list) =
+    and private parseEntries (ts: TokenStream) (argsAcc: Value list) (propsAcc: Property list) (childrenOnly: bool) =
         match Stream.current ts with
         | Newline
         | Semicolon
@@ -112,28 +122,35 @@ module Parser =
         | RBrace
         | LBrace -> (List.rev argsAcc, List.rev propsAcc, [])
         | SlashDash ->
-
             Stream.advance ts
-            let _ = skipOneEntry ts
-            parseEntries ts argsAcc propsAcc
+            skipTrivialTokens ts
+            let skippedChildren, errs = skipOneEntry ts
+            let nextChildrenOnly = childrenOnly || skippedChildren
+
+            let args, props, restErrs = parseEntries ts argsAcc propsAcc nextChildrenOnly
+            let combinedErrs = errs @ restErrs
+
+            if childrenOnly && not skippedChildren then
+                (args, props, AstError.unexpectedValue "Only children blocks may follow a slashdashed children block." :: combinedErrs)
+            else
+                (args, props, combinedErrs)
+        | _ when childrenOnly ->
+            (List.rev argsAcc, List.rev propsAcc, [ AstError.unexpectedValue "Only children blocks may follow a slashdashed children block." ])
         | _ ->
             match Stream.current ts with
             | Ident _key ->
                 match lookaheadEq ts with
                 | true ->
                     let prop, errs = parseProperty ts
-                    let newProps = prop :: propsAcc
-                    let args, props, errs2 = parseEntries ts argsAcc newProps
+                    let args, props, errs2 = parseEntries ts argsAcc (prop :: propsAcc) childrenOnly
                     (args, props, errs @ errs2)
                 | false ->
                     let value, errs = parseValue ts
-                    let newArgs = value :: argsAcc
-                    let args, props, errs2 = parseEntries ts newArgs propsAcc
+                    let args, props, errs2 = parseEntries ts (value :: argsAcc) propsAcc childrenOnly
                     (args, props, errs @ errs2)
             | _ ->
                 let value, errs = parseValue ts
-                let newArgs = value :: argsAcc
-                let args, props, errs2 = parseEntries ts newArgs propsAcc
+                let args, props, errs2 = parseEntries ts (value :: argsAcc) propsAcc childrenOnly
                 (args, props, errs @ errs2)
 
     and private lookaheadEq (ts: TokenStream) =
@@ -157,20 +174,23 @@ module Parser =
             | other ->
                 Stream.advance ts
 
-                ({ Key = key; Value = Value.Null }, [ AstError.UnexpectedValue $"Expected '=', found %A{other}" ])
+                ({ Key = key; Value = Value.Null }, [ AstError.unexpectedValue $"Expected '=', found %A{other}" ])
         | tok ->
             Stream.advance ts
 
-            ({ Key = "_"; Value = Value.Null }, [ AstError.UnexpectedValue $"Expected property key, found %A{tok}" ])
+            ({ Key = "_"; Value = Value.Null }, [ AstError.unexpectedValue $"Expected property key, found %A{tok}" ])
 
     and private parseValue (ts: TokenStream) =
         match Stream.current ts with
         | String s ->
             Stream.advance ts
             (Value.String(s, None), [])
+        | RawString s ->
+            Stream.advance ts
+            (Value.String(s, None), [])
         | Number n ->
             Stream.advance ts
-            (Value.Number(n, None), [])
+            (Value.Number(NumberLiteral.ofRaw n, None), [])
         | Keyword "#true" ->
             Stream.advance ts
             (Value.Boolean true, [])
@@ -180,10 +200,18 @@ module Parser =
         | Keyword "#null" ->
             Stream.advance ts
             (Value.Null, [])
-        // TODO: handle #inf, #-inf, #nan as numbers w/ tags
+        | Keyword "#inf" ->
+            Stream.advance ts
+            (Value.Number(NumberLiteral.special "#inf" SpecialNumberKind.Infinity, None), [])
+        | Keyword "#-inf" ->
+            Stream.advance ts
+            (Value.Number(NumberLiteral.special "#-inf" SpecialNumberKind.NegativeInfinity, None), [])
+        | Keyword "#nan" ->
+            Stream.advance ts
+            (Value.Number(NumberLiteral.special "#nan" SpecialNumberKind.NotANumber, None), [])
         | tok ->
             Stream.advance ts
-            (Value.Null, [ AstError.UnexpectedValue $"Unexpected value token %A{tok}" ])
+            (Value.Null, [ AstError.unexpectedValue $"Unexpected value token %A{tok}" ])
 
     and private parseOptChildren (ts: TokenStream) =
         match Stream.current ts with
@@ -197,7 +225,7 @@ module Parser =
                 (nodes, errs)
             | other ->
                 Stream.advance ts
-                (nodes, AstError.UnexpectedValue $"Expected '}}', found %A{other}" :: errs)
+                (nodes, AstError.unexpectedValue $"Expected '}}', found %A{other}" :: errs)
         | _ -> ([], [])
 
     and private parseTerminator (ts: TokenStream) =
@@ -206,12 +234,14 @@ module Parser =
         | Semicolon -> Stream.advance ts
         | _ -> ()
 
-    /// Skip exactly one entry after a slashdash. We make a conservative implementation:
-    /// - if the next token starts a children block, we skip the whole block;
-    /// - if it's a prop, skip prop; else skip value.
+    /// Skip exactly one entry after a slashdash. Returns true if a children block was skipped.
     and private skipOneEntry (ts: TokenStream) =
+        skipTrivialTokens ts
+
         match Stream.current ts with
         | LBrace ->
+            Stream.advance ts
+
             let rec skipChildren depth =
                 match Stream.current ts with
                 | LBrace ->
@@ -220,7 +250,7 @@ module Parser =
                 | RBrace ->
                     Stream.advance ts
 
-                    if depth > 1 then
+                    if depth > 0 then
                         skipChildren (depth - 1)
                 | Eof -> ()
                 | _ ->
@@ -228,18 +258,19 @@ module Parser =
                     skipChildren depth
 
             skipChildren 0
-        | Ident _ ->
-            if lookaheadEq ts then
-                Stream.advance ts
-                Stream.advance ts
-                let _, _ = parseValue ts
-                ()
-            else
-                let _, _ = parseValue ts
-                ()
+            (true, [])
+        | TypeLParen ->
+            let _, typeErrs = parseOptTypeAnn ts
+            let skippedChildren, restErrs = skipOneEntry ts
+            (skippedChildren, typeErrs @ restErrs)
+        | Ident _ when lookaheadEq ts ->
+            Stream.advance ts
+            Stream.advance ts
+            let _, valueErrs = parseValue ts
+            (false, valueErrs)
         | _ ->
-            let _, _ = parseValue ts
-            ()
+            let _, valueErrs = parseValue ts
+            (false, valueErrs)
 
     /// Parse a KDL source string into a Document.
     let parse (source: string) : ParseResult<Document> =

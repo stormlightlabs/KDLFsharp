@@ -11,6 +11,8 @@
         <Compile Include="Lexer.fs" />
         <Compile Include="Parser.fs" />
         <Compile Include="Render.fs" />
+        <Compile Include="Serialize.fs" />
+        <Compile Include="Deserialize.fs" />
         <Compile Include="IR.fs" />
         <Compile Include="Conversion.fs" />
         <Compile Include="XML.fs" />

@@ -173,11 +173,221 @@ dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj data/sample-park.kdl
 dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj data/zellij.kdl
 ```
 
+## Programmatic Usage
+
+### Record Serialization and Deserialization
+
+The `KDLFSharp.Core.Serialize` and `KDLFSharp.Core.Deserialize` modules provide automatic conversion between F# records and KDL documents using reflection.
+
+#### Basic Usage
+
+```fsharp
+open KDLFSharp.Core
+open KDLFSharp.Core.Serialize
+open KDLFSharp.Core.Deserialize
+
+// Define a record type
+type Person = {
+    Name: string
+    Age: int
+    Height: float
+    IsActive: bool
+}
+
+// Create an instance
+let person = {
+    Name = "Alice"
+    Age = 30
+    Height = 5.6
+    IsActive = true
+}
+
+// Serialize to KDL string
+match Serialize.toString SerializeConfig.Default person with
+| Ok kdl -> printfn "%s" kdl
+| Error e -> printfn "Error: %O" e
+
+// Deserialize from KDL string
+let kdlText = """
+Person {
+    Name="Bob"
+    Age=25
+    Height=6.1
+    IsActive=false
+}
+"""
+
+match Deserialize.fromString<Person> SerializeConfig.Default kdlText with
+| Ok person -> printfn "Loaded: %s, age %d" person.Name person.Age
+| Error e -> printfn "Error: %O" e
+```
+
+#### Supported Types
+
+The serializer supports:
+
+- Primitives: `string`, `bool`, `int`, `int64`, `float`, `float32`, `decimal`, `byte`, `int16`, `uint16`, `uint32`, `uint64`
+- Special values: `infinity`, `negative infinity`, `NaN`
+- Optional fields: `option<'T>` (None values are omitted)
+- Lists and arrays: `'T list`, `'T array`
+- Nested records: Serialized as child nodes
+- Null values: Represented as `#null`
+
+#### Examples
+
+<details>
+<summary>
+Optional Fields
+</summary>
+
+```fsharp
+type Contact = {
+    Name: string
+    Email: string option
+    Phone: string option
+}
+
+let contact = {
+    Name = "Charlie"
+    Email = Some "charlie@example.com"
+    Phone = None  // Will be omitted from KDL
+}
+```
+
+</details>
+
+<details>
+<summary>
+Nested Records
+</summary>
+
+```fsharp
+type Address = {
+    Street: string
+    City: string
+    ZipCode: string
+}
+
+type PersonWithAddress = {
+    Name: string
+    Age: int
+    Address: Address  // Serialized as child node
+}
+
+let person = {
+    Name = "David"
+    Age = 28
+    Address = {
+        Street = "123 Main St"
+        City = "Austin"
+        ZipCode = "78701"
+    }
+}
+```
+
+Results in KDL:
+
+```kdl
+PersonWithAddress {
+    Name="David"
+    Age=28
+    Address {
+        Street="123 Main St"
+        City="Austin"
+        ZipCode="78701"
+    }
+}
+```
+
+</details>
+
+<details>
+<summary>
+Lists and Arrays
+</summary>
+
+```fsharp
+type Team = {
+    Name: string
+    Members: string list
+    Scores: int array
+}
+
+let team = {
+    Name = "Engineering"
+    Members = ["Alice"; "Bob"; "Charlie"]
+    Scores = [| 95; 87; 92 |]
+}
+```
+
+Lists of primitives become arguments, while lists of records become child nodes:
+
+```fsharp
+type Company = {
+    Name: string
+    Employees: Person list
+}
+```
+
+</details>
+
+#### Configuration
+
+<details>
+<summary>
+Customize serialization behavior with `SerializeConfig`
+</summary>
+
+```fsharp
+let config = {
+    NestedRecordsAsChildren = true      // Nest records as child nodes
+    ListItemsAsChildren = false         // Lists as arguments (default)
+    IncludeTypeAnnotations = true       // Add type info for round-trips
+    RootNodeName = Some "custom-name"   // Override node name
+}
+
+toString config myRecord
+```
+
+</details>
+
+#### Error Handling
+
+<details>
+<summary>
+All serialization operations return `Result<'T, SerializeError>`
+</summary>
+
+```fsharp
+type SerializeError =
+    | UnsupportedType of string
+    | MissingRequiredField of string
+    | TypeMismatch of expected: string * actual: string
+    | InvalidValue of string
+    | DeserializationFailed of string
+```
+
+</details>
+
+#### API Reference
+
+**Serialization (Serialize module):**
+
+- `toNode: SerializeConfig -> obj -> SerializeResult<Node>` - Serialize record to Node
+- `toDocument: SerializeConfig -> obj -> SerializeResult<Document>` - Serialize to Document
+- `toString: SerializeConfig -> obj -> SerializeResult<string>` - Serialize to KDL string
+
+**Deserialization (Deserialize module):**
+
+- `fromNode<'T>: SerializeConfig -> Node -> SerializeResult<'T>` - Deserialize Node to record
+- `fromDocument<'T>: SerializeConfig -> Document -> SerializeResult<'T>` - Deserialize from Document
+- `fromString<'T>: SerializeConfig -> string -> SerializeResult<'T>` - Deserialize from KDL string
+
 ## TODO
 
 - [x] JSON <-> KDL
 - [x] XML <-> KDL
-- [ ] Record serialization to Map records to KDL and back
+- [x] Record serialization to Map records to KDL and back
 - [ ] Parse and manipulate KDL documents programmatically (Document Model)
 - [ ] Query Language
 - [ ] Schema Validation

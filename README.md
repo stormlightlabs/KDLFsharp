@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD033 -->
 # KDL F\#
 
 ![Project Banner](./data/assets/banner.png)
@@ -13,19 +14,16 @@ It ships:
 
 ## CLI
 
-The CLI uses exposes the lexer + parser output from the library and surfaced errors
-include token index + friendly messages, inspired by Expecto.
+The CLI exposes the lexer and parser from the library, rendering KDL documents as colored AST trees with node/property counts, typed values, and severity-styled diagnostics for errors.
 
-### Example
+### Quick Start
+
+View a KDL document as an AST tree
 
 ```sh
 dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj data/zellij.kdl
+```
 
-By default `kdl-to-json` and `kdl-to-xml` emit a structured representation of the AST (nodes + values with explicit kinds/type annotations).
-Pass `--debug` to work with the canonical IR schema defined in `KDLFSharp.Core.JSON` / `XML`, or `--sample --lossy` to mirror the friendly data samples (properties/children surfaced as plain fields with metadata tucked into `_meta` blocks).
-The sample XML metadata namespace defaults to the GitHub repo but can be overridden with `--sample-ns`.
-
-<!-- markdownlint-disable MD033 -->
 <details>
 <summary>
 Example Output
@@ -34,6 +32,130 @@ Example Output
 ![Output screenshot](./data/assets/screenshot.png)
 
 </details>
+
+### Commands
+
+<details>
+<summary>
+Parse KDL files and display the AST structure:
+</summary>
+
+```sh
+# Parse from file
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj data/sample-park.kdl
+
+# Parse from stdin
+cat data/sample-park.kdl | dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- -
+```
+
+</details>
+
+<details>
+<summary>
+Convert KDL documents to JSON
+</summary>
+
+```sh
+# Structured output (default) - AST with explicit types
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- kdl-to-json data/sample-park.kdl
+
+# Save to file
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- kdl-to-json data/sample-park.kdl --out output.json
+
+# Debug mode - canonical IR for lossless round-trips
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- kdl-to-json data/sample-park.kdl --debug
+
+# Sample mode - human-friendly format (lossy)
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- kdl-to-json data/sample-park.kdl --sample --lossy
+```
+
+</details>
+
+<details>
+<summary>
+Convert JSON back to KDL
+</summary>
+
+```sh
+# From structured JSON
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- json-to-kdl data/sample-park.json
+
+# From debug IR
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- json-to-kdl data/sample-park.ir.json --debug
+
+# From sample format
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- json-to-kdl data/sample-park.sample.json --sample
+
+# With colored output
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- json-to-kdl data/sample-park.json --pretty
+```
+
+</details>
+
+<details>
+<summary>
+Convert KDL documents to XML
+</summary>
+
+```sh
+# Structured output (default)
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- kdl-to-xml data/sample-library.kdl
+
+# Debug mode
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- kdl-to-xml data/sample-library.kdl --debug
+
+# Sample mode with custom namespace
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- kdl-to-xml data/sample-library.kdl --sample --lossy --sample-ns https://example.com/kdl-meta
+```
+
+</details>
+
+<details>
+<summary>
+Convert XML back to KDL
+</summary>
+
+```sh
+# From structured XML
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- xml-to-kdl data/sample-library.xml
+
+# From debug IR
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- xml-to-kdl data/sample-library.ir.xml --debug
+
+# From sample format
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- xml-to-kdl data/sample-library.sample.xml --sample
+```
+
+</details>
+
+<details>
+<summary>
+Conversion Output Modes
+</summary>
+
+### Structured (`default`)
+
+AST representation with explicit node types, value kinds, and type annotations.
+Suitable for programmatic access and preserves the full KDL structure.
+
+### Debug (`--debug`)
+
+Canonical intermediate representation (IR) defined in `KDLFSharp.Core.JSON` and `KDLFSharp.Core.XML`.
+Enables lossless round-trip conversions with complete fidelity.
+
+### Sample (`--sample` `--lossy`)
+
+Human-friendly format where properties and children are surfaced as plain fields with metadata in `_meta` blocks.
+Lossy by design and optimized for readability over round-trip accuracy. Requires explicit `--lossy` acknowledgement.
+
+</details>
+
+### Options
+
+```sh
+# See help for an exhaustive list of options
+dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj -- help
+```
 
 ## Local Development
 

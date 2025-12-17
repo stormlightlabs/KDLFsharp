@@ -43,14 +43,10 @@ module Style =
         $"\u001b[38;2;{r};{g};{b}m{text}\u001b[0m"
 
     let write color text = Console.Write(render color text)
-
     let writeLine color text = Console.WriteLine(render color text)
-
     let dim text = write Palette.dim text
     let dimLine text = writeLine Palette.dim text
-
     let connector prefix branch = write Palette.dim $"{prefix}{branch}"
-
     let severity color label message = writeLine color $"{label}: {message}"
 
     let info message =
@@ -168,16 +164,86 @@ let printErrors source errs =
 
 
 let printUsage () =
-    printfn "Usage:"
-    printfn "  kdlfsharp-cli <path-to.kdl> | - (prints AST tree)"
-    printfn "  kdlfsharp-cli kdl-to-json <path|- > [--out <file>] [--debug | --sample --lossy]"
-    printfn "  kdlfsharp-cli json-to-kdl <path|- > [--out <file>] [--debug]"
-    printfn "  kdlfsharp-cli kdl-to-xml <path|- > [--out <file>] [--debug | --sample --lossy] [--sample-ns <uri>]"
-    printfn "  kdlfsharp-cli xml-to-kdl <path|- > [--out <file>] [--debug]"
+    Style.write Style.Palette.lightAzure "KDL "
+    Style.write Style.Palette.azureDark "F# "
+    Style.write Style.Palette.lightLavender "CLI"
+    Style.write Style.Palette.dim ":"
+    Style.write Style.Palette.lightRed " Parse, display, and convert to & from KDL"
     printfn ""
-    printfn "  --debug emits/consumes the canonical IR format; without it, structured JSON/XML is used."
-    printfn "  --sample mirrors the friendly sample data (lossy, requires --lossy acknowledgement)."
-    printfn "  --sample-ns overrides the XML metadata namespace used by sample output (defaults to the repo URL)."
+    printfn ""
+    Style.writeLine Style.Palette.azureLight "USAGE:"
+    Style.write Style.Palette.purple "    kdlfsharp-cli "
+    Style.write Style.Palette.lightLavender "<command> <input> "
+    Style.writeLine Style.Palette.dim "[options]"
+    printfn ""
+    Style.writeLine Style.Palette.azureLight "COMMANDS:"
+    Style.write Style.Palette.purple "    kdl-to-json    "
+    Style.dimLine "Convert KDL to JSON"
+    Style.write Style.Palette.purple "    json-to-kdl    "
+    Style.dimLine "Convert JSON to KDL"
+    Style.write Style.Palette.purple "    kdl-to-xml     "
+    Style.dimLine "Convert KDL to XML"
+    Style.write Style.Palette.purple "    xml-to-kdl     "
+    Style.dimLine "Convert XML to KDL"
+    printfn ""
+    Style.writeLine Style.Palette.azureLight "INPUT:"
+    Style.write Style.Palette.lightLavender "    <path>         "
+    Style.dimLine "Path to input file"
+    Style.write Style.Palette.lightLavender "    -              "
+    Style.dimLine "Read from stdin"
+    printfn ""
+    Style.writeLine Style.Palette.azureLight "OPTIONS:"
+    Style.write Style.Palette.lightAzure "    --out "
+    Style.write Style.Palette.lightLavender "<file>       "
+    Style.dimLine "Write output to file (default: stdout)"
+    Style.write Style.Palette.lightAzure "    --pretty           "
+    Style.dimLine "Enable colored output to stdout"
+    Style.write Style.Palette.lightAzure "    --debug            "
+    Style.dimLine "Use canonical IR schema (lossless round-trips)"
+    Style.write Style.Palette.lightAzure "    --sample --lossy   "
+    Style.dimLine "Use friendly sample format (lossy, for human reading)"
+    Style.write Style.Palette.lightAzure "    --sample-ns "
+    Style.write Style.Palette.lightLavender "<uri>  "
+    Style.dimLine "Override XML metadata namespace (sample mode only)"
+    printfn ""
+    Style.writeLine Style.Palette.azureLight "OUTPUT MODES:"
+    Style.write Style.Palette.purple "    Structured "
+    Style.write Style.Palette.lightAzure "(default) "
+    Style.dimLine "- AST with explicit types and annotations"
+    Style.write Style.Palette.purple "    Debug "
+    Style.write Style.Palette.lightAzure "(--debug)      "
+    Style.dimLine "- Canonical IR for lossless round-trips"
+    Style.write Style.Palette.purple "    Sample "
+    Style.write Style.Palette.lightAzure "(--sample)    "
+    Style.dimLine "- Human-friendly format with metadata in _meta blocks"
+    printfn ""
+    Style.writeLine Style.Palette.azureLight "EXAMPLES:"
+    Style.write Style.Palette.dim "    "
+    Style.write Style.Palette.purple "kdlfsharp-cli "
+    Style.writeLine Style.Palette.lightLavender "data/sample.kdl"
+    Style.write Style.Palette.dim "    "
+    Style.write Style.Palette.purple "kdlfsharp-cli "
+    Style.write Style.Palette.azureDark "kdl-to-json "
+    Style.write Style.Palette.lightLavender "data/sample.kdl "
+    Style.write Style.Palette.lightAzure "--out "
+    Style.writeLine Style.Palette.lightLavender "output.json"
+    Style.write Style.Palette.dim "    "
+    Style.write Style.Palette.purple "kdlfsharp-cli "
+    Style.write Style.Palette.azureDark "json-to-kdl "
+    Style.write Style.Palette.lightLavender "input.json "
+    Style.writeLine Style.Palette.lightAzure "--pretty"
+    Style.write Style.Palette.dim "    "
+    Style.write Style.Palette.purple "kdlfsharp-cli "
+    Style.write Style.Palette.azureDark "kdl-to-xml "
+    Style.write Style.Palette.lightLavender "data/sample.kdl "
+    Style.writeLine Style.Palette.lightAzure "--sample --lossy"
+    Style.write Style.Palette.dim "    "
+    Style.write Style.Palette.purple "cat "
+    Style.write Style.Palette.lightAzure "data/sample.kdl "
+    Style.write Style.Palette.dim "| "
+    Style.write Style.Palette.purple "kdlfsharp-cli "
+    Style.writeLine Style.Palette.lightLavender "-"
+    printfn ""
 
 let readSourceArg arg =
     match arg with
@@ -414,28 +480,38 @@ let readInput argv =
 let main argv =
     let args = argv |> List.ofArray
 
-    match tryParseConversionCommand args with
-    | Some(Ok cmd) ->
-        match cmd.Kind with
-        | KdlToJson -> runKdlToJson cmd
-        | KdlToXml -> runKdlToXml cmd
-        | JsonToKdl -> runJsonToKdl cmd
-        | XmlToKdl -> runXmlToKdl cmd
-    | Some(Error msg) ->
-        Style.error msg
+    match args with
+    | [] when not Console.IsInputRedirected ->
         printUsage ()
-        1
-    | None ->
-        match readInput argv with
-        | Error msg ->
+        0
+    | [ "--help" ]
+    | [ "-h" ]
+    | [ "help" ] ->
+        printUsage ()
+        0
+    | _ ->
+        match tryParseConversionCommand args with
+        | Some(Ok cmd) ->
+            match cmd.Kind with
+            | KdlToJson -> runKdlToJson cmd
+            | KdlToXml -> runKdlToXml cmd
+            | JsonToKdl -> runJsonToKdl cmd
+            | XmlToKdl -> runXmlToKdl cmd
+        | Some(Error msg) ->
             Style.error msg
             printUsage ()
             1
-        | Ok(text, source) ->
-            match Parser.parse text with
-            | Ok nodes ->
-                printDocument source nodes
-                0
-            | Error errs ->
-                printErrors source errs
+        | None ->
+            match readInput argv with
+            | Error msg ->
+                Style.error msg
+                printUsage ()
                 1
+            | Ok(text, source) ->
+                match Parser.parse text with
+                | Ok nodes ->
+                    printDocument source nodes
+                    0
+                | Error errs ->
+                    printErrors source errs
+                    1

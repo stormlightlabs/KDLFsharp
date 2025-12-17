@@ -2,6 +2,7 @@ namespace KDLFSharp.Tests.Serialize
 
 open Expecto
 open KDLFSharp.Tests.Serialize.TestCases
+open KDLFSharp.Core.IR
 
 module JSONTests =
 

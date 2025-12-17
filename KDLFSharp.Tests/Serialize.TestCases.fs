@@ -1,39 +1,10 @@
 namespace KDLFSharp.Tests.Serialize
 
+open KDLFSharp.Core.IR
+
 /// Intermediate Representation (IR) for KDL conversion tests.
 /// This IR is designed to be expressible in JSON/YAML/XML and provides a canonical format for round-trip conversion testing.
 module TestCases =
-
-    /// Value kind for the IR
-    type ValueKind =
-        | String
-        | Number
-        | Bool
-        | Null
-        /// For #inf, #-inf, #nan
-        | Keyword
-
-    /// IR Value representation
-    type IRValue =
-        {
-            /// KDL type annotation (t)
-            TypeAnnotation: string option
-            /// k
-            Kind: ValueKind
-            /// v (actual value; for Keyword use string: "#inf", "#-inf", "#nan")
-            Value: obj
-        }
-
-    /// IR Node representation
-    type IRNode =
-        { Name: string
-          Type: string option
-          Arguments: IRValue list
-          Properties: Map<string, IRValue>
-          Children: IRNode list }
-
-    /// IR Document = array of nodes
-    type IRDocument = IRNode list
 
     /// Test case definition
     type TestCase =
@@ -46,48 +17,6 @@ module TestCases =
           JsonInput: string option
           YamlInput: string option }
 
-    let stringValue v =
-        { TypeAnnotation = None
-          Kind = String
-          Value = v }
-
-    let typedStringValue t v =
-        { TypeAnnotation = Some t
-          Kind = String
-          Value = v }
-
-    let numberValue (v: float) =
-        { TypeAnnotation = None
-          Kind = Number
-          Value = v }
-
-    let typedNumberValue t (v: float) =
-        { TypeAnnotation = Some t
-          Kind = Number
-          Value = v }
-
-    let boolValue v =
-        { TypeAnnotation = None
-          Kind = Bool
-          Value = v }
-
-    let nullValue =
-        { TypeAnnotation = None
-          Kind = Null
-          Value = null }
-
-    let keywordValue v =
-        { TypeAnnotation = None
-          Kind = Keyword
-          Value = v }
-
-    /// Helper for building nodes
-    let node name typeAnn args props children =
-        { Name = name
-          Type = typeAnn
-          Arguments = args
-          Properties = props
-          Children = children }
 
     let T001 =
         { Id = "T001"

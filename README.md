@@ -47,3 +47,8 @@ dotnet run --project KDLFSharp.Tests/KDLFSharp.Tests.fsproj
 dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj data/sample-park.kdl
 dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj data/zellij.kdl
 ```
+
+## TODO
+
+- [ ] JSON <-> KDL
+- [ ] XML <-> KDL

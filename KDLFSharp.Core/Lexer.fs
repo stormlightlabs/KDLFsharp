@@ -660,13 +660,17 @@ module Lexer =
             skipLineComment st
 
     /// Skip a /* ... */ comment, supporting nesting.
+    /// Returns true if comment was properly closed, false if unterminated.
     let private skipBlockComment (st: LexerState) =
         let mutable depth = 1
+        let mutable unterminated = false
 
         let rec loop () =
             if depth > 0 then
                 match advance st with
-                | None -> depth <- 0
+                | None ->
+                    unterminated <- true
+                    depth <- 0
                 | Some '/' ->
                     match peek st with
                     | Some '*' ->
@@ -693,6 +697,7 @@ module Lexer =
                 | Some _ -> loop ()
 
         loop ()
+        not unterminated
 
     let private skipBom (st: LexerState) =
         if st.Pos = 0 then
@@ -715,7 +720,7 @@ module Lexer =
                 skipContinuationWhitespace st
             | Some '*' ->
                 advanceMany st 2
-                skipBlockComment st
+                skipBlockComment st |> ignore
                 skipContinuationWhitespace st
             | _ -> ()
         | _ -> ()
@@ -766,9 +771,13 @@ module Lexer =
                     skipLineComment st
                     nextToken st
                 | Some '*' ->
+                    let start = currentPos st - 2
                     advance st |> ignore
-                    skipBlockComment st
-                    nextToken st
+
+                    if skipBlockComment st then
+                        nextToken st
+                    else
+                        TokenError("Unterminated multi-line comment", start)
                 | _ -> Ident "/"
             | '{' -> LBrace
             | '}' -> RBrace

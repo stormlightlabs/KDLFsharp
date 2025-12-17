@@ -667,11 +667,10 @@ let negativeSyntaxTests =
         "K. Targeted negative syntax tests (fast failure)"
         [ test "K01: Unterminated quoted string" { expectParseError "note \"oops" }
 
-          ptestCase "K02: Unterminated multi-line comment"
-          <| fun () ->
-              // INPUT: /* oops\nzilker
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO"
+          test "K02: Unterminated multi-line comment" {
+              let input = "/* oops\nzilker"
+              expectParseError input
+          }
 
           test "K03: Missing closing brace in children block" { expectParseError "parks { zilker" }
 

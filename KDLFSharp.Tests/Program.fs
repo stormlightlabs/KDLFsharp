@@ -517,17 +517,15 @@ let stringTests =
               Expect.equal text "Here's a \"\"\"\nmultiline string" "raw multiline retains content"
           }
 
-          ptestCase "F12: Disallowed literal code points must not appear literally"
-          <| fun () ->
-              // INPUT: note "bad<NUL>char"
-              // EXPECTED: PARSE ERROR (U+0000..0008, U+000E..001F disallowed)
-              skiptest "TODO"
+          test "F12: Disallowed literal code points must not appear literally" {
+              let input = "note \"bad\u0000char\""
+              expectParseError input
+          }
 
-          ptestCase "F13: Disallowed code points via Unicode escapes"
-          <| fun () ->
-              // INPUT: note "ok \\u{0}"
-              // EXPECTED: PARSE ERROR or implementation-defined
-              skiptest "TODO" ]
+          test "F13: Disallowed code points via Unicode escapes" {
+              let input = "note \"ok \\u{0}\""
+              expectParseError input
+          } ]
 
 [<Tests>]
 let numberTests =
@@ -578,11 +576,10 @@ let numberTests =
                   "keyword numbers preserved"
           }
 
-          ptestCase "G06: Bare identifier 'inf' is illegal as an identifier string"
-          <| fun () ->
-              // INPUT: inf
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO" ]
+          test "G06: Bare identifier 'inf' is illegal as an identifier string" {
+              let input = "inf"
+              expectParseError input
+          } ]
 
 [<Tests>]
 let booleanAndNullTests =

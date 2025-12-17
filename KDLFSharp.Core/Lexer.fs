@@ -63,6 +63,12 @@ module private LexUtil =
     let inline isWhitespaceChar c =
         c = ' ' || c = '\t' || c = '\r' || c = '\n'
 
+    /// Check if a character is a disallowed literal code point per KDL spec.
+    /// Disallowed: U+0000..0008, U+000E..001F (except tab, newline, carriage return which are handled separately)
+    let inline isDisallowedLiteral c =
+        let code = int c
+        (code >= 0x0000 && code <= 0x0008) || (code >= 0x000E && code <= 0x001F)
+
     let peek (st: LexerState) =
         if st.Pos >= st.Source.Length then
             None
@@ -160,6 +166,8 @@ module Lexer =
 
                     if value > 0x10FFFF || (value >= 0xD800 && value <= 0xDFFF) then
                         Error $"Unicode escape at {startPos} is not a scalar value"
+                    elif (value >= 0x0000 && value <= 0x0008) || (value >= 0x000E && value <= 0x001F) then
+                        Error $"Unicode escape at {startPos} contains disallowed code point U+%04X{value}"
                     else
                         let rune = Rune(value)
                         Ok(rune.ToString())
@@ -220,6 +228,8 @@ module Lexer =
                         | None -> error <- Some $"Unterminated escape starting at {startPos}"
                 | Some '\n'
                 | Some '\r' -> error <- Some $"Unescaped newline inside string starting at {startPos}"
+                | Some c when isDisallowedLiteral c ->
+                    error <- Some $"Disallowed literal code point U+%04X{int c} in string starting at {startPos}"
                 | Some c ->
                     appendEscape c
                     loop ()
@@ -424,6 +434,8 @@ module Lexer =
                         currentLine.Clear() |> ignore
                         bumpLine st
                         loop ()
+                    | Some c when isDisallowedLiteral c ->
+                        error <- Some $"Disallowed literal code point U+%04X{int c} in multi-line string at {startPos}"
                     | Some c ->
                         appendChar c
                         loop ()
@@ -843,8 +855,11 @@ module Lexer =
                 let sb = StringBuilder()
                 sb.Append(c) |> ignore
                 let ident = lexIdent st sb
+                let start = currentPos st - ident.Length
 
                 match ident with
+                | "inf"
+                | "nan" -> TokenError($"Bare identifier '{ident}' is reserved (use #{ident} for keyword)", start)
                 | _ -> Ident ident
             | '\uFEFF' -> TokenError("Unexpected BOM in document", currentPos st - 1)
             | other -> TokenError($"Unexpected character '%c{other}'", currentPos st)

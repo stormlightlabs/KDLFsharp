@@ -9,6 +9,7 @@
         <Compile Include="Serialize.TestCases.fs"/>
         <Compile Include="Serialize.XML.Test.fs"/>
         <Compile Include="Serialize.JSON.Test.fs"/>
+        <Compile Include="Conversion.Test.fs"/>
         <Compile Include="Program.fs"/>
     </ItemGroup>
 

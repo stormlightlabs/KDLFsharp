@@ -12,8 +12,11 @@
         <Compile Include="Parser.fs" />
         <Compile Include="Render.fs" />
         <Compile Include="IR.fs" />
+        <Compile Include="Conversion.fs" />
         <Compile Include="XML.fs" />
         <Compile Include="JSON.fs" />
+        <Compile Include="StructuredJSON.fs" />
+        <Compile Include="StructuredXML.fs" />
     </ItemGroup>
 
 </Project>

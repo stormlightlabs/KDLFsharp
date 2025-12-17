@@ -1,0 +1,12 @@
+{
+    "park": {
+        "id": "walnut-creek-metro",
+        "source": "parks_directory",
+        "name": "Walnut Creek Metropolitan Park",
+        "address": "12138 N Lamar Blvd, Austin, Texas 78758",
+        "acres": 295.95,
+        "kind": "Metropolitan",
+        "offLeashArea": true,
+        "offLeashSource": "offleash_list"
+    }
+}

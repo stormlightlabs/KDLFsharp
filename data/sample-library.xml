@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<library id="central" system="Austin Public Library" source="apl_branches">
+  <name>Central Library</name>
+  <phone>512-974-7400</phone>
+  <address>710 W. César Chávez St.</address>
+  <hours>
+    <day name="Sunday" open="12:00" close="17:00" />
+    <day name="Monday" open="09:00" close="20:00" />
+    <day name="Tuesday" open="09:00" close="20:00" />
+    <day name="Wednesday" open="09:00" close="20:00" />
+    <day name="Thursday" open="09:00" close="20:00" />
+    <day name="Friday" open="09:00" close="17:00" />
+    <day name="Saturday" open="10:00" close="17:00" />
+  </hours>
+</library>

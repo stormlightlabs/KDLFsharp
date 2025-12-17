@@ -1,0 +1,19 @@
+{
+    "library": {
+        "id": "howson",
+        "system": "Austin Public Library",
+        "source": "apl_branches",
+        "name": "Howson Branch",
+        "phone": "512-974-8800",
+        "address": "2500 Exposition Blvd.",
+        "hours": [
+            { "day": "Sunday", "closed": true },
+            { "day": "Monday", "open": "09:00", "close": "20:00" },
+            { "day": "Tuesday", "open": "09:00", "close": "20:00" },
+            { "day": "Wednesday", "open": "09:00", "close": "20:00" },
+            { "day": "Thursday", "open": "09:00", "close": "20:00" },
+            { "day": "Friday", "open": "09:00", "close": "17:00" },
+            { "day": "Saturday", "open": "10:00", "close": "17:00" }
+        ]
+    }
+}

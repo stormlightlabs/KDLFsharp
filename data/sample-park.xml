@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<park id="emma-long-metro" source="parks_directory">
+  <name>Emma Long Metropolitan Park</name>
+  <address>1600 City Park Rd., Austin, Texas 78730</address>
+  <acres units="acres">1147.2216</acres>
+  <kind>Metropolitan</kind>
+  <off-leash source="offleash_list">true</off-leash>
+</park>

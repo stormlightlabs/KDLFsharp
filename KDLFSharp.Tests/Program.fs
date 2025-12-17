@@ -8,6 +8,35 @@ let private showTokens toks =
 /// Run lexer on input and return stringified tokens
 let private lex input = Lexer.tokenize input |> showTokens
 
+let private parseSingleNode input =
+    match Parser.parse input with
+    | Ok [ node ] -> node
+    | Ok nodes -> failtestf "Expected exactly 1 node, found %d" nodes.Length
+    | Error errs -> failtestf "Parse failed: %A" errs
+
+let private parseNodes input =
+    match Parser.parse input with
+    | Ok nodes -> nodes
+    | Error errs -> failtestf "Parse failed: %A" errs
+
+let private expectParseError input =
+    match Parser.parse input with
+    | Error errs -> Expect.isFalse errs.IsEmpty "Expected parse errors"
+    | Ok nodes -> failtestf "Expected parse error but got AST: %A" nodes
+
+let private propMap (node: Node) =
+    node.Properties |> List.map (fun p -> p.Key, p.Value) |> Map.ofList
+
+let private stringOfValue value =
+    match value with
+    | Value.String(s, _) -> s
+    | other -> failtestf "Expected string value, got %A" other
+
+let private numberLiteral value =
+    match value with
+    | Value.Number(lit, _) -> lit
+    | other -> failtestf "Expected number value, got %A" other
+
 [<Tests>]
 let tests =
     testList
@@ -81,8 +110,17 @@ let tests =
               Expect.isTrue hasError "unterminated string should produce error"
           }
 
-          // TODO: add multiline string tests
-          test "TODO multiline and raw strings" { Expect.isTrue true "placeholder for raw/multiline" } ]
+          test "multiline string literal tokenized" {
+              let input = "msg \"\"\"\nline1\nline2\n\"\"\""
+              let toks = lex input
+              Expect.equal toks "Ident(msg) String(line1\nline2) <eof>" "multiline string collapsed"
+          }
+
+          test "raw string literal tokenized" {
+              let input = "msg #\"\\n will be literal\"#"
+              let toks = lex input
+              Expect.equal toks "Ident(msg) RawString(\\n will be literal) <eof>" "raw string retains escapes"
+          } ]
 
 [<Tests>]
 let documentStructureTests =
@@ -164,12 +202,12 @@ let whitespaceTests =
               | Error errs -> failtestf "Parse failed: %A" errs
           }
 
-          ptestCase "B02: Multi-line comment is whitespace (and may be nested)"
-          <| fun () ->
-              // INPUT: /* outer /* inner */ still outer */ zilker
-              // EXPECTED: AST = [zilker]
-              // TODO: Nested block comments not yet supported in lexer
-              skiptest "Nested block comments not implemented"
+          test "B02: Multi-line comment is whitespace (and may be nested)" {
+              let input = "/* outer /* inner */ still outer */ zilker"
+              let nodes = parseNodes input
+              Expect.hasLength nodes 1 "nested comments treated as whitespace"
+              Expect.equal nodes[0].Name "zilker" "node should survive after comments"
+          }
 
           test "B03: Slashdash entire node (node is removed)" {
               let input = "/- zilker\npease"
@@ -182,40 +220,52 @@ let whitespaceTests =
               | Error errs -> failtestf "Parse failed: %A" errs
           }
 
-          ptestCase "B04: Slashdash argument removes that argument only"
-          <| fun () ->
-              // INPUT: trail "Lady Bird Lake" /- 3.1 miles open=#true
-              // EXPECTED: trail.args = ["Lady Bird Lake"], trail.props.open = #true
-              // TODO: Per-entry slashdash needs refinement in parser
-              skiptest "Slashdash on individual arguments not fully implemented"
+          test "B04: Slashdash argument removes that argument only" {
+              let input = "trail \"Lady Bird Lake\" /- 3.1 open=#true"
+              let node = parseSingleNode input
+              Expect.equal node.Arguments.Length 1 "only one argument remains"
 
-          ptestCase "B05: Slashdash property removes key+value"
-          <| fun () ->
-              // INPUT: park name="Zilker" /- hidden=#true open=#true
-              // EXPECTED: park.props = {name:"Zilker", open:#true}
-              // TODO: Per-entry slashdash needs refinement in parser
-              skiptest "Slashdash on individual properties not fully implemented"
+              match node.Arguments[0] with
+              | Value.String(s, _) -> Expect.equal s "Lady Bird Lake" "string argument preserved"
+              | v -> failtestf "Expected string argument, got %A" v
 
-          ptestCase "B06: Slashdash 'just the property value' is illegal"
-          <| fun () ->
-              // INPUT: park hidden=/- #true
-              // EXPECTED: PARSE ERROR
-              // TODO: Need to detect and reject this syntax
-              skiptest "Slashdash validation not implemented"
+              let props = propMap node
 
-          ptestCase "B07: Slashdash children block removes the whole block"
-          <| fun () ->
-              // INPUT: park "Zilker" /- { note "should vanish" }
-              // EXPECTED: park.children = []
-              // TODO: Slashdash on children blocks needs implementation
-              skiptest "Slashdash on children blocks not implemented"
+              match Map.tryFind "open" props with
+              | Some(Value.Boolean true) -> ()
+              | other -> failtestf "Expected open property, got %A" other
+          }
 
-          ptestCase "B08: After a slashdashed children block, only (other) children blocks may follow"
-          <| fun () ->
-              // INPUT: park "Zilker" /- { a } note "nope"
-              // EXPECTED: PARSE ERROR
-              // TODO: Need to enforce this constraint
-              skiptest "Slashdashed children block constraint not enforced" ]
+          test "B05: Slashdash property removes key+value" {
+              let input = "park name=\"Zilker\" /- hidden=#true open=#true"
+              let node = parseSingleNode input
+              let props = propMap node
+              Expect.equal props.Count 2 "slashdashed property removed"
+
+              match Map.tryFind "name" props with
+              | Some(Value.String(s, _)) -> Expect.equal s "Zilker" "name preserved"
+              | other -> failtestf "Expected name property, got %A" other
+
+              match Map.tryFind "open" props with
+              | Some(Value.Boolean true) -> ()
+              | other -> failtestf "Expected open=#true, got %A" other
+          }
+
+          test "B06: Slashdash 'just the property value' is illegal" {
+              let input = "park hidden=/- #true"
+              expectParseError input
+          }
+
+          test "B07: Slashdash children block removes the whole block" {
+              let input = "park \"Zilker\" /- { note \"should vanish\" }"
+              let node = parseSingleNode input
+              Expect.isEmpty node.Children "slashdashed children removed"
+          }
+
+          test "B08: After a slashdashed children block, only children blocks may follow" {
+              let input = "park \"Zilker\" /- { a } note \"nope\""
+              expectParseError input
+          } ]
 
 [<Tests>]
 let lineContinuationTests =
@@ -246,11 +296,27 @@ let lineContinuationTests =
 let propertiesAndArgumentsTests =
     testList
         "D. Properties and argument ordering"
-        [ ptestCase "D01: Arguments preserve relative order even when properties are interleaved"
-          <| fun () ->
-              // INPUT: foo 1 a=10 3 b=20 5
-              // EXPECTED: foo.args = [1,3,5], foo.props = {a:10,b:20}
-              skiptest "TODO"
+        [ test "D01: Arguments preserve relative order even when properties are interleaved" {
+              let node = parseSingleNode "foo 1 a=10 3 b=20 5"
+
+              let args =
+                  node.Arguments
+                  |> List.choose (function
+                      | Value.Number(lit, _) -> Some lit.Raw
+                      | _ -> None)
+
+              Expect.equal args [ "1"; "3"; "5" ] "argument order preserved"
+
+              let props = propMap node
+
+              match Map.tryFind "a" props with
+              | Some(Value.Number(lit, _)) -> Expect.equal lit.Raw "10" "property a"
+              | other -> failtestf "Expected property a, got %A" other
+
+              match Map.tryFind "b" props with
+              | Some(Value.Number(lit, _)) -> Expect.equal lit.Raw "20" "property b"
+              | other -> failtestf "Expected property b, got %A" other
+          }
 
           ptestCase "D02: Rightmost property wins on duplicate keys"
           <| fun () ->
@@ -274,11 +340,15 @@ let propertiesAndArgumentsTests =
 let typeAnnotationTests =
     testList
         "E. Type annotations"
-        [ ptestCase "E01: Type annotation on node name"
-          <| fun () ->
-              // INPUT: (published)date "1970-01-01"
-              // EXPECTED: node.name="date", node.type="published", args=["1970-01-01"]
-              skiptest "TODO"
+        [ test "E01: Type annotation on node name" {
+              let node = parseSingleNode "(published)date \"1970-01-01\""
+              Expect.equal node.Name "date" "node name"
+              Expect.equal node.TypeAnn (Some "published") "type annotation preserved"
+
+              match node.Arguments with
+              | [ Value.String(s, _) ] -> Expect.equal s "1970-01-01" "argument captured"
+              | other -> failtestf "Unexpected arguments %A" other
+          }
 
           ptestCase "E02: Type annotation on a value"
           <| fun () ->
@@ -292,81 +362,76 @@ let typeAnnotationTests =
               // EXPECTED: same as E01
               skiptest "TODO"
 
-          ptestCase "E04: Slashdash can appear before a type annotation it is commenting out"
-          <| fun () ->
-              // INPUT: park /- (tag)"experimental" open=#true
-              // EXPECTED: park.props.open=#true, typed string argument is absent
-              skiptest "TODO" ]
+          test "E04: Slashdash can appear before a type annotation it is commenting out" {
+              let node = parseSingleNode "park /- (tag)\"experimental\" open=#true"
+              Expect.isEmpty node.Arguments "slashdashed typed argument removed"
+              let props = propMap node
+
+              match Map.tryFind "open" props with
+              | Some(Value.Boolean true) -> ()
+              | other -> failtestf "Expected open=#true, got %A" other
+          } ]
 
 [<Tests>]
 let stringTests =
     testList
         "F. Strings (identifier, quoted, multiline, raw) + escapes"
-        [ ptestCase "F01: Identifier string node name"
-          <| fun () ->
-              // INPUT: zilker
-              // EXPECTED: node.name="zilker"
-              skiptest "TODO"
+        [ ptestCase "F01: Identifier string node name" <| fun () -> skiptest "TODO"
 
-          ptestCase "F02: Quoted string node name (spaces)"
-          <| fun () ->
-              // INPUT: "zilker park"
-              // EXPECTED: node.name="zilker park"
-              skiptest "TODO"
+          ptestCase "F02: Quoted string node name (spaces)" <| fun () -> skiptest "TODO"
 
-          ptestCase "F03: Identifier strings cannot contain forbidden punctuation"
-          <| fun () ->
-              // INPUT: zilker#park
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO"
+          test "F03: Identifier strings cannot contain forbidden punctuation" { expectParseError "zilker#park" }
 
-          ptestCase "F04: Quoted string with common escapes"
-          <| fun () ->
-              // INPUT: note "Line1\\nLine2\\tTabbed"
-              // EXPECTED: note.args[0] == "Line1\nLine2\tTabbed"
-              skiptest "TODO"
+          test "F04: Quoted string with common escapes" {
+              let node = parseSingleNode "note \"Line1\\nLine2\\tTabbed\""
+              let text = node.Arguments |> List.head |> stringOfValue
+              Expect.equal text "Line1\nLine2\tTabbed" "escapes processed"
+          }
 
-          ptestCase "F05: Unicode escape in quoted string"
-          <| fun () ->
-              // INPUT: park name="Zilker \\u{26F2}"
-              // EXPECTED: name == "Zilker ⛲" (U+26F2)
-              skiptest "TODO"
+          test "F05: Unicode escape in quoted string" {
+              let node = parseSingleNode "park name=\"Zilker \\u{26F2}\""
+              let props = propMap node
 
-          ptestCase "F06: Escaped whitespace inside quoted string is discarded"
-          <| fun () ->
-              // INPUT: msg "Hello \\    World"
-              // EXPECTED: msg.args[0] == "Hello World"
-              skiptest "TODO"
+              match Map.tryFind "name" props with
+              | Some value ->
+                  let actual = stringOfValue value
+                  Expect.equal actual ("Zilker " + "\u26F2") "unicode escape converted"
+              | None -> failtest "Missing name property"
+          }
 
-          ptestCase "F07: Multi-line string basic (dedent rule)"
-          <| fun () ->
-              // INPUT: desc \"\"\"\nFirst line\n  Indented\n\"\"\"
-              // EXPECTED: desc.args[0] == "First line\n  Indented"
-              skiptest "TODO"
+          test "F06: Escaped whitespace inside quoted string is discarded" {
+              let node = parseSingleNode "msg \"Hello \\    World\""
+              let text = node.Arguments |> List.head |> stringOfValue
+              Expect.equal text "Hello World" "escaped whitespace removed"
+          }
 
-          ptestCase "F08: Multi-line string cannot be single-line (illegal)"
-          <| fun () ->
-              // INPUT: desc \"\"\"nope\"\"\"
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO"
+          test "F07: Multi-line string basic (dedent rule)" {
+              let node = parseSingleNode "desc \"\"\"\nFirst line\n  Indented\n\"\"\""
+              let text = node.Arguments |> List.head |> stringOfValue
+              Expect.equal text "First line\n  Indented" "multiline contents preserved"
+          }
 
-          ptestCase "F09: Raw single-line string (no escapes processed)"
-          <| fun () ->
-              // INPUT: just #"\\n will be literal"#
-              // EXPECTED: just.args[0] == "\\n will be literal"
-              skiptest "TODO"
+          test "F08: Multi-line string cannot be single-line (illegal)" { expectParseError "desc \"\"\"nope\"\"\"" }
 
-          ptestCase "F10: Raw string delimiter with multiple # (can contain quotes)"
-          <| fun () ->
-              // INPUT: raw ##"hello\\n\\r\\asd\"#world"##
-              // EXPECTED: raw.args[0] == "hello\\n\\r\\asd\"#world"
-              skiptest "TODO"
+          test "F09: Raw single-line string (no escapes processed)" {
+              let node = parseSingleNode "just #\"\\n will be literal\"#"
+              let text = node.Arguments |> List.head |> stringOfValue
+              Expect.equal text "\\n will be literal" "raw string preserves backslash"
+          }
 
-          ptestCase "F11: Raw multi-line string (no escapes; dedent rules)"
-          <| fun () ->
-              // INPUT: rawml #\"\"\"\nHere's a \"\"\"\nmultiline string\n\"\"\"#
-              // EXPECTED: literal triple-quotes text without escapes
-              skiptest "TODO"
+          test "F10: Raw string delimiter with multiple # (can contain quotes)" {
+              let node = parseSingleNode "raw ##\"hello\\n\\r\\asd\"#world\"##"
+              let text = node.Arguments |> List.head |> stringOfValue
+              Expect.equal text "hello\\n\\r\\asd\"#world" "raw string keeps internal quotes"
+          }
+
+          test "F11: Raw multi-line string (no escapes; dedent rules)" {
+              let node =
+                  parseSingleNode "rawml #\"\"\"\nHere's a \"\"\"\nmultiline string\n\"\"\"#"
+
+              let text = node.Arguments |> List.head |> stringOfValue
+              Expect.equal text "Here's a \"\"\"\nmultiline string" "raw multiline retains content"
+          }
 
           ptestCase "F12: Disallowed literal code points must not appear literally"
           <| fun () ->
@@ -384,35 +449,50 @@ let stringTests =
 let numberTests =
     testList
         "G. Numbers (decimal, hex, octal, binary, underscores, exponent, keyword numbers)"
-        [ ptestCase "G01: Decimal integer"
-          <| fun () ->
-              // INPUT: n 123
-              // EXPECTED: n.args[0] == 123
-              skiptest "TODO"
+        [ test "G01: Decimal integer" {
+              let node = parseSingleNode "n 123"
+              let lit = node.Arguments |> List.head |> numberLiteral
+              Expect.equal lit.Raw "123" "raw literal"
+              Expect.equal lit.Kind NumberKind.Decimal "decimal kind"
+          }
 
-          ptestCase "G02: Decimal with fraction and exponent"
-          <| fun () ->
-              // INPUT: n 1_234.50e+2
-              // EXPECTED: n.args[0] == 1234.50e+2 (underscores ignored)
-              skiptest "TODO"
+          test "G02: Decimal with fraction and exponent" {
+              let node = parseSingleNode "n 1_234.50e+2"
+              let lit = node.Arguments |> List.head |> numberLiteral
+              Expect.equal lit.Raw "1_234.50e+2" "raw literal preserved"
+              Expect.equal lit.Kind NumberKind.Decimal "still decimal"
+          }
 
-          ptestCase "G03: Binary / octal / hex"
-          <| fun () ->
-              // INPUT: nums 0b1010 0o17 0xFF
-              // EXPECTED: args == [10, 15, 255]
-              skiptest "TODO"
+          test "G03: Binary / octal / hex" {
+              let node = parseSingleNode "nums 0b1010 0o17 0xFF"
+              let lits = node.Arguments |> List.map numberLiteral
+              let kinds = lits |> List.map (fun l -> l.Kind)
 
-          ptestCase "G04: Leading decimal point is illegal"
-          <| fun () ->
-              // INPUT: n .1
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO"
+              Expect.equal
+                  kinds
+                  [ NumberKind.Binary; NumberKind.Octal; NumberKind.Hexadecimal ]
+                  "base-prefixed kinds detected"
+          }
 
-          ptestCase "G05: Keyword numbers"
-          <| fun () ->
-              // INPUT: n #inf #nan #-inf
-              // EXPECTED: args == [#inf, #nan, #-inf]
-              skiptest "TODO"
+          test "G04: Leading decimal point is illegal" { expectParseError "n .1" }
+
+          test "G05: Keyword numbers" {
+              let node = parseSingleNode "n #inf #nan #-inf"
+
+              let kinds =
+                  node.Arguments
+                  |> List.map (fun v ->
+                      match numberLiteral v with
+                      | { Kind = NumberKind.Special special } -> special
+                      | lit -> failtestf "Expected special number, got %A" lit.Kind)
+
+              Expect.equal
+                  kinds
+                  [ SpecialNumberKind.Infinity
+                    SpecialNumberKind.NotANumber
+                    SpecialNumberKind.NegativeInfinity ]
+                  "keyword numbers preserved"
+          }
 
           ptestCase "G06: Bare identifier 'inf' is illegal as an identifier string"
           <| fun () ->
@@ -424,65 +504,87 @@ let numberTests =
 let booleanAndNullTests =
     testList
         "H. Booleans and null"
-        [ ptestCase "H01: Boolean literals"
-          <| fun () ->
-              // INPUT: flags #true enabled=#false
-              // EXPECTED: flags.args[0]=#true, flags.props.enabled=#false
-              skiptest "TODO"
+        [ test "H01: Boolean literals" {
+              let node = parseSingleNode "flags #true enabled=#false"
 
-          ptestCase "H02: Null literal"
-          <| fun () ->
-              // INPUT: maybe #null value=#null
-              // EXPECTED: args[0]=#null, props.value=#null
-              skiptest "TODO" ]
+              match node.Arguments with
+              | Value.Boolean true :: _ -> ()
+              | other -> failtestf "Expected boolean arg, got %A" other
+
+              let props = propMap node
+
+              match Map.tryFind "enabled" props with
+              | Some(Value.Boolean false) -> ()
+              | other -> failtestf "Expected enabled=#false, got %A" other
+          }
+
+          test "H02: Null literal" {
+              let node = parseSingleNode "maybe #null value=#null"
+
+              match node.Arguments with
+              | Value.Null :: _ -> ()
+              | other -> failtestf "Expected #null argument, got %A" other
+
+              let props = propMap node
+
+              match Map.tryFind "value" props with
+              | Some Value.Null -> ()
+              | other -> failtestf "Expected value=#null, got %A" other
+          } ]
 
 [<Tests>]
 let newlineTests =
     testList
         "I. Newlines (CRLF handling) and multi-line string newline normalization"
-        [ ptestCase "I01: CRLF is a single newline for node termination"
-          <| fun () ->
-              // INPUT: zilker<CRLF>pease<CRLF>
-              // EXPECTED: AST = [zilker, pease]
-              skiptest "TODO"
+        [ test "I01: CRLF is a single newline for node termination" {
+              let nodes = parseNodes "zilker\r\npease\r\n"
+              Expect.equal (List.map (fun n -> n.Name) nodes) [ "zilker"; "pease" ] "CRLF handled"
+          }
 
-          ptestCase "I02: Multi-line string literal newlines normalized to LF"
-          <| fun () ->
-              // INPUT: s \"\"\"\na[CRLF]\nb[CRLF]\n\"\"\"
-              // EXPECTED: s.args[0] == "a\nb"
-              skiptest "TODO" ]
+          test "I02: Multi-line string literal newlines normalized to LF" {
+              let node = parseSingleNode "s \"\"\"\na\r\nb\r\n\"\"\""
+              let text = node.Arguments |> List.head |> stringOfValue
+              Expect.equal text "a\nb" "CRLF normalized inside multiline"
+          } ]
 
 [<Tests>]
 let childrenBlockTests =
     testList
         "J. Children blocks / hierarchy"
-        [ ptestCase "J01: Simple hierarchy"
-          <| fun () ->
-              // INPUT: parks {\npark "Zilker"\npark "Pease"\n}
-              // EXPECTED: parks.children = [park("Zilker"), park("Pease")]
-              skiptest "TODO"
+        [ test "J01: Simple hierarchy" {
+              let node = parseSingleNode "parks {\npark \"Zilker\"\npark \"Pease\"\n}"
+              Expect.equal (node.Children |> List.map (fun n -> n.Name)) [ "park"; "park" ] "two child nodes"
 
-          ptestCase "J02: Nested hierarchy with mixed entries"
-          <| fun () ->
-              // INPUT: park "Zilker" open=#true {\namenity "pool" name="Barton Springs"\n}
-              // EXPECTED: park.args=["Zilker"], park.props.open=#true, 2 children
-              skiptest "TODO"
+              let childArgs =
+                  node.Children
+                  |> List.map (fun n -> n.Arguments |> List.map stringOfValue |> List.head)
 
-          ptestCase "J03: Children blocks can be on same line if nodes are terminated with semicolons"
-          <| fun () ->
-              // INPUT: parks { park "Zilker"; park "Pease"; }
-              // EXPECTED: parks.children length == 2
-              skiptest "TODO" ]
+              Expect.equal childArgs [ "Zilker"; "Pease" ] "child arguments captured"
+          }
+
+          test "J02: Nested hierarchy with mixed entries" {
+              let node =
+                  parseSingleNode "park \"Zilker\" open=#true {\namenity \"pool\"\namenity name=\"Barton Springs\"\n}"
+
+              let childNames = node.Children |> List.map (fun n -> n.Name)
+              Expect.equal childNames [ "amenity"; "amenity" ] "two amenity children"
+              let props = propMap node
+
+              match Map.tryFind "open" props with
+              | Some(Value.Boolean true) -> ()
+              | other -> failtestf "Expected open property, got %A" other
+          }
+
+          test "J03: Children blocks can be on same line if nodes are terminated with semicolons" {
+              let node = parseSingleNode "parks { park \"Zilker\"; park \"Pease\"; }"
+              Expect.equal node.Children.Length 2 "two children on single line"
+          } ]
 
 [<Tests>]
 let negativeSyntaxTests =
     testList
         "K. Targeted negative syntax tests (fast failure)"
-        [ ptestCase "K01: Unterminated quoted string"
-          <| fun () ->
-              // INPUT: note "oops
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO"
+        [ test "K01: Unterminated quoted string" { expectParseError "note \"oops" }
 
           ptestCase "K02: Unterminated multi-line comment"
           <| fun () ->
@@ -490,35 +592,18 @@ let negativeSyntaxTests =
               // EXPECTED: PARSE ERROR
               skiptest "TODO"
 
-          ptestCase "K03: Missing closing brace in children block"
-          <| fun () ->
-              // INPUT: parks { zilker
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO"
+          test "K03: Missing closing brace in children block" { expectParseError "parks { zilker" }
 
-          ptestCase "K04: Property missing value"
-          <| fun () ->
-              // INPUT: park name=
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO"
+          test "K04: Property missing value" { expectParseError "park name=" }
 
-          ptestCase "K05: Property key must be a string (not a bare keyword)"
-          <| fun () ->
-              // INPUT: park #true=1
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO"
+          test "K05: Property key must be a string (not a bare keyword)" { expectParseError "park #true=1" }
 
-          ptestCase "K06: Disallowed literal BOM except at start of document"
-          <| fun () ->
-              // INPUT: zilker <BOM> pease
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO"
+          test "K06: Disallowed literal BOM except at start of document" {
+              let input = "zilker \uFEFF pease"
+              expectParseError input
+          }
 
-          ptestCase "K07: Slashdash cannot be followed by another slashdash"
-          <| fun () ->
-              // INPUT: /- /- zilker
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO" ]
+          test "K07: Slashdash cannot be followed by another slashdash" { expectParseError "/- /- zilker" } ]
 
 [<Tests>]
 let roundTripTests =

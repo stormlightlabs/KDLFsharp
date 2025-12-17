@@ -131,11 +131,16 @@ module Parser =
             let combinedErrs = errs @ restErrs
 
             if childrenOnly && not skippedChildren then
-                (args, props, AstError.unexpectedValue "Only children blocks may follow a slashdashed children block." :: combinedErrs)
+                (args,
+                 props,
+                 AstError.unexpectedValue "Only children blocks may follow a slashdashed children block."
+                 :: combinedErrs)
             else
                 (args, props, combinedErrs)
         | _ when childrenOnly ->
-            (List.rev argsAcc, List.rev propsAcc, [ AstError.unexpectedValue "Only children blocks may follow a slashdashed children block." ])
+            (List.rev argsAcc,
+             List.rev propsAcc,
+             [ AstError.unexpectedValue "Only children blocks may follow a slashdashed children block." ])
         | _ ->
             match Stream.current ts with
             | Ident _key ->

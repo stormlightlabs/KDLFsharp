@@ -55,13 +55,13 @@ module private LexUtil =
         isAlpha c || isDigit c || c = '-' || c = '_'
 
     let inline isHexDigit c =
-        (c >= '0' && c <= '9')
-        || (c >= 'a' && c <= 'f')
-        || (c >= 'A' && c <= 'F')
+        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 
     let inline isOctDigit c = c >= '0' && c <= '7'
     let inline isBinDigit c = c = '0' || c = '1'
-    let inline isWhitespaceChar c = c = ' ' || c = '\t' || c = '\r' || c = '\n'
+
+    let inline isWhitespaceChar c =
+        c = ' ' || c = '\t' || c = '\r' || c = '\n'
 
     let peek (st: LexerState) =
         if st.Pos >= st.Source.Length then
@@ -111,7 +111,7 @@ module Lexer =
     let private consumeEscapedWhitespace (st: LexerState) =
         let rec loop () =
             match peek st with
-            | Some (' ' | '\t') ->
+            | Some(' ' | '\t') ->
                 advance st |> ignore
                 loop ()
             | Some '\r' ->
@@ -141,7 +141,7 @@ module Lexer =
                 if hex.Length = 0 then
                     Error $"Empty unicode escape at {startPos}"
                 else
-                    Ok ()
+                    Ok()
             | Some c when isHexDigit c ->
                 if hex.Length >= 6 then
                     Error $"Unicode escape too long at {startPos}"
@@ -172,8 +172,7 @@ module Lexer =
         let mutable finished = false
         let mutable error: string option = None
 
-        let appendEscape (ch: char) =
-            sb.Append(ch) |> ignore
+        let appendEscape (ch: char) = sb.Append(ch) |> ignore
 
         let rec loop () =
             if not finished && error.IsNone then
@@ -216,14 +215,11 @@ module Lexer =
                             | Ok value ->
                                 sb.Append(value) |> ignore
                                 loop ()
-                            | Error msg ->
-                                error <- Some msg
-                        | Some other ->
-                            error <- Some $"Unknown escape '\\{other}' at {startPos}"
+                            | Error msg -> error <- Some msg
+                        | Some other -> error <- Some $"Unknown escape '\\{other}' at {startPos}"
                         | None -> error <- Some $"Unterminated escape starting at {startPos}"
                 | Some '\n'
-                | Some '\r' ->
-                    error <- Some $"Unescaped newline inside string starting at {startPos}"
+                | Some '\r' -> error <- Some $"Unescaped newline inside string starting at {startPos}"
                 | Some c ->
                     appendEscape c
                     loop ()
@@ -284,8 +280,7 @@ module Lexer =
         if text.Length = 0 || String.IsNullOrEmpty indent then
             Ok text
         else
-            let lines =
-                text.Split([| '\n' |], StringSplitOptions.None)
+            let lines = text.Split([| '\n' |], StringSplitOptions.None)
 
             let sb = StringBuilder()
             let mutable idx = 0
@@ -302,7 +297,8 @@ module Lexer =
                 elif line.StartsWith(indent) then
                     sb.Append(line.Substring(indent.Length)) |> ignore
                 else
-                    error <- Some $"Line {idx + 1} of multi-line string does not match indentation declared at {startPos}"
+                    error <-
+                        Some $"Line {idx + 1} of multi-line string does not match indentation declared at {startPos}"
 
                 idx <- idx + 1
 
@@ -311,8 +307,7 @@ module Lexer =
             | None -> Ok(sb.ToString())
 
     let private lexMultiline (st: LexerState) (startPos: int) (isRaw: bool) (hashCount: int) =
-        let closingSuffix =
-            if isRaw then new String('#', hashCount) else String.Empty
+        let closingSuffix = if isRaw then new String('#', hashCount) else String.Empty
 
         let closing = "\"\"\"" + closingSuffix
         let content = StringBuilder()
@@ -326,7 +321,7 @@ module Lexer =
             | Some '\n' ->
                 advance st |> ignore
                 bumpLine st
-                Ok ()
+                Ok()
             | Some '\r' ->
                 advance st |> ignore
 
@@ -335,7 +330,7 @@ module Lexer =
                 | _ -> ()
 
                 bumpLine st
-                Ok ()
+                Ok()
             | _ -> Error $"Multi-line string must start with a newline at {startPos}"
 
         let inline currentLineIsWhitespace () =
@@ -450,7 +445,13 @@ module Lexer =
             lexIdent st sb
         | _ -> sb.ToString()
 
-    let private lexBaseNumber (st: LexerState) (startPos: int) (sb: StringBuilder) (digitPredicate: char -> bool) (kindName: string) =
+    let private lexBaseNumber
+        (st: LexerState)
+        (startPos: int)
+        (sb: StringBuilder)
+        (digitPredicate: char -> bool)
+        (kindName: string)
+        =
         let mutable hasDigits = false
         let mutable lastWasUnderscore = false
         let mutable error: string option = None
@@ -547,7 +548,7 @@ module Lexer =
                         prevWasDigit <- false
                         lastWasUnderscore <- false
                         loop ()
-                | Some ('e' | 'E' as c) when not seenExponent ->
+                | Some('e' | 'E' as c) when not seenExponent ->
                     if not seenDigits && not seenFractionDigits then
                         error <- Some $"Exponent requires digits before it at {startPos}"
                     else
@@ -558,7 +559,7 @@ module Lexer =
                         prevWasDigit <- false
                         lastWasUnderscore <- false
                         loop ()
-                | Some ('+' | '-' as c) when expectExponentSign ->
+                | Some('+' | '-' as c) when expectExponentSign ->
                     advance st |> ignore
                     sb.Append(c) |> ignore
                     expectExponentSign <- false
@@ -572,8 +573,10 @@ module Lexer =
         | Some msg -> Error msg
         | None when lastWasUnderscore -> Error $"Trailing underscore in number starting at {startPos}"
         | None when expectExponentSign -> Error $"Exponent missing digits in number starting at {startPos}"
-        | None when seenFraction && not seenFractionDigits -> Error $"Fractional part missing digits in number starting at {startPos}"
-        | None when seenExponent && not seenExponentDigits -> Error $"Exponent missing digits in number starting at {startPos}"
+        | None when seenFraction && not seenFractionDigits ->
+            Error $"Fractional part missing digits in number starting at {startPos}"
+        | None when seenExponent && not seenExponentDigits ->
+            Error $"Exponent missing digits in number starting at {startPos}"
         | None when not seenDigits && not seenFractionDigits -> Error $"Number must contain digits at {startPos}"
         | None -> Ok(sb.ToString())
 
@@ -601,15 +604,15 @@ module Lexer =
                 sb.Append('0') |> ignore
 
                 match peek st with
-                | Some ('x' | 'X' as c) ->
+                | Some('x' | 'X' as c) ->
                     advance st |> ignore
                     sb.Append(c) |> ignore
                     parsePrefixed isHexDigit "hexadecimal"
-                | Some ('o' | 'O' as c) ->
+                | Some('o' | 'O' as c) ->
                     advance st |> ignore
                     sb.Append(c) |> ignore
                     parsePrefixed isOctDigit "octal"
-                | Some ('b' | 'B' as c) ->
+                | Some('b' | 'B' as c) ->
                     advance st |> ignore
                     sb.Append(c) |> ignore
                     parsePrefixed isBinDigit "binary"
@@ -617,15 +620,15 @@ module Lexer =
             | _ -> emitDecimal false
         | '0' ->
             match peek st with
-            | Some ('x' | 'X' as c) ->
+            | Some('x' | 'X' as c) ->
                 advance st |> ignore
                 sb.Append(c) |> ignore
                 parsePrefixed isHexDigit "hexadecimal"
-            | Some ('o' | 'O' as c) ->
+            | Some('o' | 'O' as c) ->
                 advance st |> ignore
                 sb.Append(c) |> ignore
                 parsePrefixed isOctDigit "octal"
-            | Some ('b' | 'B' as c) ->
+            | Some('b' | 'B' as c) ->
                 advance st |> ignore
                 sb.Append(c) |> ignore
                 parsePrefixed isBinDigit "binary"
@@ -741,6 +744,7 @@ module Lexer =
             | '-' when (peek st |> Option.map isDigit = Some true) -> lexNumberLiteral st '-'
             | '#' ->
                 let start = currentPos st - 1
+
                 let rec countExtraHashes offset =
                     match peekAhead st offset with
                     | Some '#' -> countExtraHashes (offset + 1)
@@ -749,6 +753,7 @@ module Lexer =
                 let extraHashes = countExtraHashes 0
                 let hashCount = 1 + extraHashes
                 let charAfterHashes = peekAhead st extraHashes
+
                 let isRawMultiline =
                     match charAfterHashes, peekAhead st (extraHashes + 1), peekAhead st (extraHashes + 2) with
                     | Some '"', Some '"', Some '"' -> true

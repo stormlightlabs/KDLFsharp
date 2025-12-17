@@ -132,10 +132,16 @@ module AstError =
           Context = None }
 
     let unexpectedValue msg = mk AstErrorKind.UnexpectedValue msg
-    let invalidTypeAnnotation msg = mk AstErrorKind.InvalidTypeAnnotation msg
+
+    let invalidTypeAnnotation msg =
+        mk AstErrorKind.InvalidTypeAnnotation msg
+
     let duplicateProperty msg = mk AstErrorKind.DuplicateProperty msg
     let unterminatedString msg = mk AstErrorKind.UnterminatedString msg
-    let unexpectedEof msg = mk AstErrorKind.UnexpectedEndOfInput msg
+
+    let unexpectedEof msg =
+        mk AstErrorKind.UnexpectedEndOfInput msg
+
     let other msg = mk AstErrorKind.Other msg
 
     let withSpan (span: SourceSpan) (err: AstError) = { err with Span = Some span }

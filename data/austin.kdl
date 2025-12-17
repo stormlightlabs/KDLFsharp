@@ -1,0 +1,298 @@
+/- kdl-version 2
+(meta)dataset "austin-parks-and-libraries"
+    version="1.0.0"
+    generated_at=(date)"2025-12-16"
+    license="CC-BY-4.0"
+{
+    // --- Provenance / sources (URLs shown with raw-string syntax) ---
+    sources {
+        source id="parks_directory"
+            name="City of Austin Park Directory"
+            url=#"https://www.austintexas.gov/page/park-directory"#
+            fields="park name, address, acres"
+
+        source id="apl_branches"
+            name="Austin Public Library branch pages"
+            url=#"https://library.austintexas.gov/"#
+            fields="address, phone, weekly hours"
+
+        source id="offleash_list"
+            name="Austin Parks Foundation: off-leash areas"
+            url=#"https://austinparks.org/dog-parks/"#
+            fields="off-leash presence (informational; third-party)"
+            reliability_note="Not an official City inventory; treat as a helpful hint."
+    }
+
+    // --- A rich multi-line string (dedented by closing quotes) ---
+    about """
+        This KDL file is both:
+          1) a real-ish mini catalog of Austin parks + APL branches
+          2) a “kitchen sink” syntax example for KDL 2.0.0
+
+        Notes:
+        - Park acres/addresses are taken from the City of Austin park directory.
+        - Library hours/phones are taken from APL branch pages.
+        - Off-leash flags are taken from Austin Parks Foundation (third-party).
+        """
+
+    /* Nested multiline comments are allowed.
+       /* Like this. */
+       End of nested comment. */
+
+    // --- Quick feature demo block (doesn’t pretend to be city data) ---
+    kdl_features_demo {
+        // Numbers: decimal, exponent, hex, binary w/ underscores, keyword numbers
+        numbers
+            int=(i32)42
+            big=(i64)9_223_372_036_854_775_807
+            float=(f64)1.25e3
+            hex=0xDEAD_BEEF
+            bin=0b1010_0101
+            pos_inf=#inf
+            neg_inf=#-inf
+            nan=#nan
+
+        // Booleans + null
+        flags enabled=#true disabled=#false missing=#null
+
+        // Strings: identifier, quoted, raw, multi-line, raw multi-line
+        strings
+            identifier_string=hello_world
+            quoted_string="César Chávez"
+            raw_string=#"backslashes \ stay \ literal \ here"# // no escapes
+            multi_line """
+                Line 1: a "normal" multiline string (escapes work)
+                Line 2: tabs \t and newlines \n are escapes in quoted contexts
+                """
+            raw_multi_line #"""
+                Raw multiline: nothing is escaped here.
+                You can paste JSON, bash, or regex without backslash pain: \d+\s+
+                """#
+
+        // Line continuation: one node spread across lines
+        continued_example 1 2 \
+            3 4 5 \
+            key="still same node"
+            done=#true
+
+        // Slashdash comments: semantically remove whole nodes/args/props from the data model
+        /- old_setting "this node is ignored entirely"
+        slashdash_examples 1 /- 2 3 4  // argument “2” is ignored
+        slashdash_prop_demo a=1 /- b=2 c=3 // property b=2 is ignored
+
+        // Semicolon terminators
+        single_line_children { a; b; c; };
+    }
+
+    parks source="parks_directory" city="Austin" state="TX" {
+        // Each `park` node uses a stable-ish id, plus official name/address/acres.
+        park id="zilker-metro"
+            name="Zilker Metropolitan Park"
+            address="2100 Barton Springs Rd., Austin, Texas 78746"
+            acres=(f64)274.6150
+            kind="Metropolitan"
+            off_leash_area=#true
+            off_leash_source="offleash_list"
+        {
+            // A key with spaces (string keys are allowed)
+            "curator notes"="Major central park; acres/address from City directory."
+        }
+
+        park id="emma-long-metro"
+            name="Emma Long Metropolitan Park"
+            address="1600 City Park Rd., Austin, Texas 78730"
+            acres=(f64)1147.2216
+            kind="Metropolitan"
+            off_leash_area=#true
+            off_leash_source="offleash_list"
+
+        park id="pease-district"
+            name="Pease District Park"
+            address="1100 Kingsbury St., Austin, Texas 78703"
+            acres=(f64)41.4897
+            kind="District"
+
+        park id="johnson-creek-greenbelt"
+            name="Johnson Creek Greenbelt"
+            address="2001 Enfield Rd., Austin, Texas 78703"
+            acres=(f64)59.47
+            kind="Greenbelt"
+
+        park id="lions-municipal-golf"
+            name="Lions Municipal Golf Course"
+            address="2901 Enfield Rd., Austin, Texas 78703"
+            acres=(f64)155.62
+            kind="Golf Course"
+
+        park id="mary-moore-searight-metro"
+            name="Mary Moore Searight Metropolitan Park"
+            address="907 W Slaughter Ln., Austin, Texas 78748"
+            acres=(f64)342.4702
+            kind="Metropolitan"
+            off_leash_area=#true
+            off_leash_source="offleash_list"
+
+        park id="mayfield-park"
+            name="Mayfield Park"
+            address="3805 W 35th St., Austin, Texas 78703"
+            acres=(f64)23.331
+            kind="Special"
+
+        park id="michael-butler-park"
+            name="Michael Butler Park at Town Lake Metro Park"
+            address="1000 Barton Springs Rd., Austin, Texas 78704"
+            acres=(f64)20.3
+            kind="Metropolitan"
+
+        park id="michael-butler-shores"
+            name="Michael Butler Shores at Town Lake Metro Park"
+            address="200 S Lamar Blvd., Austin, Texas 78704"
+            acres=(f64)28.65
+            kind="Metropolitan"
+
+        park id="northern-walnut-creek-greenbelt"
+            name="Northern Walnut Creek Greenbelt"
+            address="2611 Park Bend Rd., Austin, Texas 78758"
+            acres=(f64)428.2080
+            kind="Greenbelt"
+
+        park id="onion-creek-metro"
+            name="Onion Creek Metropolitan Park"
+            address="8652 Nuckols Crossing Rd., Austin, Texas 78744"
+            acres=(f64)650.3721
+            kind="Metropolitan"
+
+        park id="onion-creek-greenbelt"
+            name="Onion Creek Greenbelt"
+            address="7004 Onion Creek Dr., Austin, Texas 78744"
+            acres=(f64)320.0954
+            kind="Greenbelt"
+            off_leash_area=#true
+            off_leash_source="offleash_list"
+
+        park id="shoal-creek-greenbelt"
+            name="Shoal Creek Greenbelt"
+            address="2600 N Lamar Blvd., Austin, Texas 78705"
+            acres=(f64)94.0926
+            kind="Greenbelt"
+            off_leash_area=#true
+            off_leash_source="offleash_list"
+
+        park id="waller-creek-greenbelt"
+            name="Waller Creek Greenbelt"
+            address="703 E 6th St., Austin, Texas 78701"
+            acres=(f64)7.2496
+            kind="Greenbelt"
+
+        park id="walnut-creek-metro"
+            name="Walnut Creek Metropolitan Park"
+            address="12138 N Lamar Blvd, Austin, Texas 78758"
+            acres=(f64)295.9500
+            kind="Metropolitan"
+            off_leash_area=#true
+            off_leash_source="offleash_list"
+
+        park id="walnut-creek-sports"
+            name="Walnut Creek Sports Park"
+            address="7800 Johnny Morris Rd., Austin, Texas 78724"
+            acres=(f64)217.2150
+            kind="Special"
+
+        park id="vic-mathias-shores"
+            name="Vic Mathias Shores at Town Lake Metropolitan Park"
+            address="700 W Riverside Dr., Austin, Texas 78704"
+            acres=(f64)5.76
+            kind="Metropolitan"
+
+        park id="volma-overton-sr"
+            name="Volma Overton,Sr. at Town Lake Metropolitan Park"
+            address="1200 Cesar Chavez St., Austin, Texas 78703"
+            acres=(f64)65.41
+            kind="Metropolitan"
+
+        // /- park id="future-example" name="This is ignored" acres=999
+    }
+
+    stats {
+        parks_listed (i32)18
+        total_acres_listed (f64)4177.5202
+        note="Totals are computed from the parks listed in this file (not from the full City inventory)."
+    }
+
+    libraries source="apl_branches" system="Austin Public Library" {
+        branch id="central" name="Central Library"
+            phone="512-974-7400"
+            address="710 W. César Chávez St."
+        {
+            hours {
+                day "Sunday"    open="12:00" close="17:00"
+                day "Monday"    open="09:00" close="20:00"
+                day "Tuesday"   open="09:00" close="20:00"
+                day "Wednesday" open="09:00" close="20:00"
+                day "Thursday"  open="09:00" close="20:00"
+                day "Friday"    open="09:00" close="17:00"
+                day "Saturday"  open="10:00" close="17:00"
+            }
+        }
+
+        branch id="howson" name="Howson Branch"
+            phone="512-974-8800"
+            address="2500 Exposition Blvd."
+        {
+            hours {
+                day "Sunday"    closed=#true
+                day "Monday"    open="09:00" close="20:00"
+                day "Tuesday"   open="09:00" close="20:00"
+                day "Wednesday" open="09:00" close="20:00"
+                day "Thursday"  open="09:00" close="20:00"
+                day "Friday"    open="09:00" close="17:00"
+                day "Saturday"  open="10:00" close="17:00"
+            }
+        }
+
+        branch id="carver" name="Carver Branch"
+            phone="512-974-1010"
+            address="1161 Angelina St."
+        {
+            hours {
+                day "Sunday"    closed=#true
+                day "Monday"    open="09:00" close="20:00"
+                day "Tuesday"   open="09:00" close="20:00"
+                day "Wednesday" open="09:00" close="20:00"
+                day "Thursday"  open="09:00" close="20:00"
+                day "Friday"    open="09:00" close="17:00"
+                day "Saturday"  open="10:00" close="17:00"
+            }
+        }
+
+        branch id="yarborough" name="Yarborough Branch"
+            phone="512-974-8820"
+            address="2200 Hancock Dr."
+        {
+            hours {
+                day "Sunday"    closed=#true
+                day "Monday"    open="09:00" close="20:00"
+                day "Tuesday"   open="09:00" close="20:00"
+                day "Wednesday" open="09:00" close="20:00"
+                day "Thursday"  open="09:00" close="20:00"
+                day "Friday"    open="09:00" close="17:00"
+                day "Saturday"  open="10:00" close="17:00"
+            }
+        }
+
+        branch id="windsor-park" name="Windsor Park Branch"
+            phone="512-974-9840"
+            address="5833 Westminster Dr."
+        {
+            hours {
+                day "Sunday"    closed=#true
+                day "Monday"    open="09:00" close="20:00"
+                day "Tuesday"   open="09:00" close="20:00"
+                day "Wednesday" open="09:00" close="20:00"
+                day "Thursday"  open="09:00" close="20:00"
+                day "Friday"    open="09:00" close="17:00"
+                day "Saturday"  open="10:00" close="17:00"
+            }
+        }
+    }
+}

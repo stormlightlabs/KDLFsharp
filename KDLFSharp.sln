@@ -4,6 +4,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "KDLFSharp.CLI", "KDLFSharp.
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "KDLFSharp.Core", "KDLFSharp.Core\KDLFSharp.Core.fsproj", "{7B1625F3-C24F-43CC-88A9-B1AC38A7F453}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "KDLFSharp.Tests", "KDLFSharp.Tests\KDLFSharp.Tests.fsproj", "{82CE5034-D675-4761-8E60-34BFF624F2A6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{7B1625F3-C24F-43CC-88A9-B1AC38A7F453}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7B1625F3-C24F-43CC-88A9-B1AC38A7F453}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7B1625F3-C24F-43CC-88A9-B1AC38A7F453}.Release|Any CPU.Build.0 = Release|Any CPU
+		{82CE5034-D675-4761-8E60-34BFF624F2A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{82CE5034-D675-4761-8E60-34BFF624F2A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{82CE5034-D675-4761-8E60-34BFF624F2A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{82CE5034-D675-4761-8E60-34BFF624F2A6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

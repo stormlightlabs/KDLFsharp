@@ -9,6 +9,10 @@
         <Compile Include="Library.fs"/>
         <Compile Include="AST.fs" />
         <Compile Include="Lexer.fs" />
+        <Compile Include="Parser.fs" />
+        <Compile Include="Render.fs" />
+        <Compile Include="XML.fs" />
+        <Compile Include="JSON.fs" />
     </ItemGroup>
 
 </Project>

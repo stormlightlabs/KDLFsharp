@@ -269,8 +269,7 @@ let whitespaceTests =
 
           test "B09: Property blocks may span newlines without continuations" {
               let node =
-                  parseSingleNode
-                      "dataset \"parks\"\n    version=\"1.0\"\n    generated_at=(date)\"2025-01-01\""
+                  parseSingleNode "dataset \"parks\"\n    version=\"1.0\"\n    generated_at=(date)\"2025-01-01\""
 
               let props = propMap node
               Expect.sequenceEqual (node.Arguments |> List.map stringOfValue) [ "parks" ] "argument preserved"
@@ -354,23 +353,33 @@ let propertiesAndArgumentsTests =
               | other -> failtestf "Expected property b, got %A" other
           }
 
-          ptestCase "D02: Rightmost property wins on duplicate keys"
-          <| fun () ->
-              // INPUT: park name="Zilker" name="Zilker Metropolitan Park"
-              // EXPECTED: park.props.name == "Zilker Metropolitan Park"
-              skiptest "TODO"
+          test "D02: Rightmost property wins on duplicate keys" {
+              let node = parseSingleNode "park name=\"Zilker\" name=\"Zilker Metropolitan Park\""
+              let props = propMap node
 
-          ptestCase "D03: Properties should not be treated as order-sensitive"
-          <| fun () ->
-              // INPUT: park a=1 b=2
-              // EXPECTED: props map contains a=1 and b=2
-              skiptest "TODO"
+              match Map.tryFind "name" props with
+              | Some(Value.String(s, _)) -> Expect.equal s "Zilker Metropolitan Park" "rightmost property value wins"
+              | other -> failtestf "Expected string property, got %A" other
+          }
 
-          ptestCase "D04: Property key must be a String; value must be a Value"
-          <| fun () ->
-              // INPUT: park 123=456
-              // EXPECTED: PARSE ERROR
-              skiptest "TODO" ]
+          test "D03: Properties should not be treated as order-sensitive" {
+              let node = parseSingleNode "park a=1 b=2"
+              let props = propMap node
+              Expect.equal props.Count 2 "should have exactly 2 properties"
+
+              match Map.tryFind "a" props with
+              | Some(Value.Number(lit, _)) -> Expect.equal lit.Raw "1" "property a value"
+              | other -> failtestf "Expected property a, got %A" other
+
+              match Map.tryFind "b" props with
+              | Some(Value.Number(lit, _)) -> Expect.equal lit.Raw "2" "property b value"
+              | other -> failtestf "Expected property b, got %A" other
+          }
+
+          test "D04: Property key must be a String; value must be a Value" {
+              let input = "park 123=456"
+              expectParseError input
+          } ]
 
 [<Tests>]
 let typeAnnotationTests =

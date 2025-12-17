@@ -2,8 +2,6 @@ namespace KDLFSharp.Tests.Conversion
 
 open Expecto
 open KDLFSharp.Core
-open KDLFSharp.Core.StructuredJSON
-open KDLFSharp.Core.StructuredXML
 
 module ConversionTests =
 
@@ -77,3 +75,58 @@ module ConversionTests =
                   match StructuredXML.parseDocument invalidXml with
                   | Ok _ -> failtest "Expected XML parse to fail for missing literal"
                   | Error _ -> () ]
+
+    [<Tests>]
+    let sampleEmitTests =
+        testList
+            "Sample emitters"
+            [ testCase "Sample JSON contains friendly layout"
+              <| fun () ->
+                  let json = SampleJSON.emitDocument sampleDoc
+                  Expect.isTrue (json.Contains("\"dataset\"")) "dataset key present"
+                  Expect.isTrue (json.Contains("\"_meta\"")) "metadata emitted"
+
+              testCase "Sample XML contains metadata namespace"
+              <| fun () ->
+                  let xml = SampleXML.emitDocument sampleDoc
+                  Expect.isTrue (xml.Contains("stormlightlabs")) "metadata namespace present"
+
+              testCase "Sample JSON round-trips through parser"
+              <| fun () ->
+                  let json = SampleJSON.emitDocument sampleDoc
+
+                  match SampleJSON.parseDocument json with
+                  | Ok parsed ->
+                      Expect.equal parsed.Length sampleDoc.Length "document node count preserved"
+                      Expect.equal parsed.Head.Name sampleDoc.Head.Name "root name preserved"
+
+                      Expect.equal
+                          parsed.Head.Properties.Length
+                          sampleDoc.Head.Properties.Length
+                          "property count preserved"
+
+                      Expect.equal
+                          parsed.Head.Arguments.Length
+                          sampleDoc.Head.Arguments.Length
+                          "argument count preserved"
+                  | Error err -> failtestf "Sample JSON parse failed: %s" err
+
+              testCase "Sample XML round-trips through parser"
+              <| fun () ->
+                  let xml = SampleXML.emitDocument sampleDoc
+
+                  match SampleXML.parseDocument xml with
+                  | Ok parsed ->
+                      Expect.equal parsed.Length sampleDoc.Length "document node count preserved"
+                      Expect.equal parsed.Head.Name sampleDoc.Head.Name "root name preserved"
+
+                      Expect.equal
+                          parsed.Head.Properties.Length
+                          sampleDoc.Head.Properties.Length
+                          "property count preserved"
+
+                      Expect.equal
+                          parsed.Head.Arguments.Length
+                          sampleDoc.Head.Arguments.Length
+                          "argument count preserved"
+                  | Error err -> failtestf "Sample XML parse failed: %s" err ]

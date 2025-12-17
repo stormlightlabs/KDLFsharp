@@ -20,7 +20,10 @@ include token index + friendly messages, inspired by Expecto.
 
 ```sh
 dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj data/zellij.kdl
-```
+
+By default `kdl-to-json` and `kdl-to-xml` emit a structured representation of the AST (nodes + values with explicit kinds/type annotations).
+Pass `--debug` to work with the canonical IR schema defined in `KDLFSharp.Core.JSON` / `XML`, or `--sample --lossy` to mirror the friendly data samples (properties/children surfaced as plain fields with metadata tucked into `_meta` blocks).
+The sample XML metadata namespace defaults to the GitHub repo but can be overridden with `--sample-ns`.
 
 <!-- markdownlint-disable MD033 -->
 <details>
@@ -50,5 +53,9 @@ dotnet run --project KDLFSharp.CLI/KDLFSharp.CLI.fsproj data/zellij.kdl
 
 ## TODO
 
-- [ ] JSON <-> KDL
-- [ ] XML <-> KDL
+- [x] JSON <-> KDL
+- [x] XML <-> KDL
+- [ ] Record serialization to Map records to KDL and back
+- [ ] Parse and manipulate KDL documents programmatically (Document Model)
+- [ ] Query Language
+- [ ] Schema Validation

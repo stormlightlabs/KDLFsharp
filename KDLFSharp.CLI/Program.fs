@@ -5,15 +5,39 @@ open KDLFSharp.Core
 
 Console.OutputEncoding <- Encoding.UTF8
 
+type ConversionKind =
+    | KdlToJson
+    | JsonToKdl
+    | KdlToXml
+    | XmlToKdl
+
+type OutputTarget =
+    | Stdout
+    | File of string
+
+type OutputMode =
+    | Structured
+    | Debug
+    | Sample
+
+type ConversionCommand =
+    { Kind: ConversionKind
+      Input: string
+      Target: OutputTarget
+      Mode: OutputMode
+      Pretty: bool
+      Lossy: bool
+      SampleNamespace: string option }
+
 module Style =
     module Palette =
-        let azureDark = (55, 139, 186)
-        let azureLight = (48, 185, 219)
-        let lightRed = (255, 179, 179)
-        let lightAzure = (192, 241, 255)
-        let lightLavender = (236, 214, 255)
-        let purple = (140, 82, 255)
-        let dim = (110, 110, 110)
+        let azureDark = 55, 139, 186
+        let azureLight = 48, 185, 219
+        let lightRed = 255, 179, 179
+        let lightAzure = 192, 241, 255
+        let lightLavender = 236, 214, 255
+        let purple = 140, 82, 255
+        let dim = 110, 110, 110
 
     let private render (r, g, b) text =
         $"\u001b[38;2;{r};{g};{b}m{text}\u001b[0m"
@@ -47,7 +71,7 @@ module Style =
 let branch isLast = if isLast then "└── " else "├── "
 
 let nextPrefix prefix isLast =
-    prefix + (if isLast then "    " else "│   ")
+    prefix + if isLast then "    " else "│   "
 
 let rec writeValue value =
     match value with
@@ -141,31 +165,19 @@ let printErrors source errs =
 
         err.Context |> Option.iter (fun ctx -> Style.warn ctx))
 
-type ConversionKind =
-    | KdlToJson
-    | JsonToKdl
-    | KdlToXml
-    | XmlToKdl
 
-type OutputTarget =
-    | Stdout
-    | File of string
-
-type ConversionCommand =
-    { Kind: ConversionKind
-      Input: string
-      Target: OutputTarget
-      DebugIR: bool }
 
 let printUsage () =
     printfn "Usage:"
     printfn "  kdlfsharp-cli <path-to.kdl> | - (prints AST tree)"
-    printfn "  kdlfsharp-cli kdl-to-json <path|- > [--out <file>] [--debug]"
+    printfn "  kdlfsharp-cli kdl-to-json <path|- > [--out <file>] [--debug | --sample --lossy]"
     printfn "  kdlfsharp-cli json-to-kdl <path|- > [--out <file>] [--debug]"
-    printfn "  kdlfsharp-cli kdl-to-xml <path|- > [--out <file>] [--debug]"
+    printfn "  kdlfsharp-cli kdl-to-xml <path|- > [--out <file>] [--debug | --sample --lossy] [--sample-ns <uri>]"
     printfn "  kdlfsharp-cli xml-to-kdl <path|- > [--out <file>] [--debug]"
     printfn ""
     printfn "  --debug emits/consumes the canonical IR format; without it, structured JSON/XML is used."
+    printfn "  --sample mirrors the friendly sample data (lossy, requires --lossy acknowledgement)."
+    printfn "  --sample-ns overrides the XML metadata namespace used by sample output (defaults to the repo URL)."
 
 let readSourceArg arg =
     match arg with
@@ -173,8 +185,9 @@ let readSourceArg arg =
     | path when File.Exists path -> Ok(File.ReadAllText path, path)
     | path -> Error $"file not found: {path}"
 
-let writeOutput target (content: string) =
+let writeOutput target pretty color (content: string) =
     match target with
+    | Stdout when pretty -> Style.writeLine color content
     | Stdout -> Console.WriteLine(content)
     | File path ->
         File.WriteAllText(path, content)
@@ -191,19 +204,29 @@ let runKdlToJson (cmd: ConversionCommand) =
             printErrors source errs
             1
         | Ok nodes ->
-            if cmd.DebugIR then
+            match cmd.Mode with
+            | Debug ->
                 match DocumentConversion.toIR nodes with
                 | Error err ->
                     Style.error err
                     1
                 | Ok ir ->
                     let output = JSON.emitJSON ir
-                    writeOutput cmd.Target output
+                    writeOutput cmd.Target cmd.Pretty Style.Palette.azureLight output
                     0
-            else
+            | Structured ->
                 let output = StructuredJSON.emitDocument nodes
-                writeOutput cmd.Target output
+                writeOutput cmd.Target cmd.Pretty Style.Palette.azureLight output
                 0
+            | Sample ->
+                if not cmd.Lossy then
+                    Style.error "--sample output requires --lossy acknowledgement"
+                    1
+                else
+                    Style.warn "sample output is lossy; use --debug for canonical round-trips"
+                    let output = SampleJSON.emitDocument nodes
+                    writeOutput cmd.Target cmd.Pretty Style.Palette.azureLight output
+                    0
 
 let runKdlToXml (cmd: ConversionCommand) =
     match readSourceArg cmd.Input with
@@ -216,19 +239,30 @@ let runKdlToXml (cmd: ConversionCommand) =
             printErrors source errs
             1
         | Ok nodes ->
-            if cmd.DebugIR then
+            match cmd.Mode with
+            | Debug ->
                 match DocumentConversion.toIR nodes with
                 | Error err ->
                     Style.error err
                     1
                 | Ok ir ->
                     let output = XML.emitXML ir
-                    writeOutput cmd.Target output
+                    writeOutput cmd.Target cmd.Pretty Style.Palette.lightLavender output
                     0
-            else
+            | Structured ->
                 let output = StructuredXML.emitDocument nodes
-                writeOutput cmd.Target output
+                writeOutput cmd.Target cmd.Pretty Style.Palette.lightLavender output
                 0
+            | Sample ->
+                if not cmd.Lossy then
+                    Style.error "--sample output requires --lossy acknowledgement"
+                    1
+                else
+                    Style.warn "sample output is lossy; use --debug for canonical round-trips"
+                    let ns = cmd.SampleNamespace |> Option.defaultValue SampleXML.defaultNamespace
+                    let output = SampleXML.emitDocumentWithNamespace ns nodes
+                    writeOutput cmd.Target cmd.Pretty Style.Palette.lightLavender output
+                    0
 
 let runJsonToKdl (cmd: ConversionCommand) =
     match readSourceArg cmd.Input with
@@ -236,21 +270,34 @@ let runJsonToKdl (cmd: ConversionCommand) =
         Style.error msg
         1
     | Ok(text, source) ->
-        let docResult =
-            if cmd.DebugIR then
-                JSON.parseJSON text |> Result.bind DocumentConversion.ofIR
-            else
-                StructuredJSON.parseDocument text
+        match cmd.Mode with
+        | Sample ->
+            match SampleJSON.parseDocument text with
+            | Error err ->
+                Style.error $"failed to parse sample json: {err}"
+                Style.dimLine $"  source: {source}"
+                1
+            | Ok doc ->
+                let rendered = Render.renderDocument doc
+                writeOutput cmd.Target cmd.Pretty Style.Palette.azureDark rendered
+                0
+        | Debug
+        | Structured as mode ->
+            let docResult =
+                match mode with
+                | Debug -> JSON.parseJSON text |> Result.bind DocumentConversion.ofIR
+                | Structured -> StructuredJSON.parseDocument text
+                | Sample -> failwith "unreachable"
 
-        match docResult with
-        | Error err ->
-            Style.error $"failed to parse json: {err}"
-            Style.dimLine $"  source: {source}"
-            1
-        | Ok doc ->
-            let rendered = Render.renderDocument doc
-            writeOutput cmd.Target rendered
-            0
+            match docResult with
+            | Error err ->
+                Style.error $"failed to parse json: {err}"
+                Style.dimLine $"  source: {source}"
+                1
+            | Ok doc ->
+                let rendered = Render.renderDocument doc
+                writeOutput cmd.Target cmd.Pretty Style.Palette.azureDark rendered
+                0
 
 let runXmlToKdl (cmd: ConversionCommand) =
     match readSourceArg cmd.Input with
@@ -258,37 +305,61 @@ let runXmlToKdl (cmd: ConversionCommand) =
         Style.error msg
         1
     | Ok(text, source) ->
-        let docResult =
-            if cmd.DebugIR then
-                XML.parseXML text |> Result.bind DocumentConversion.ofIR
-            else
-                StructuredXML.parseDocument text
+        match cmd.Mode with
+        | Sample ->
+            match SampleXML.parseDocument text with
+            | Error err ->
+                Style.error $"failed to parse sample xml: {err}"
+                Style.dimLine $"  source: {source}"
+                1
+            | Ok doc ->
+                let rendered = Render.renderDocument doc
+                writeOutput cmd.Target cmd.Pretty Style.Palette.lightLavender rendered
+                0
+        | Debug
+        | Structured as mode ->
+            let docResult =
+                match mode with
+                | Debug -> XML.parseXML text |> Result.bind DocumentConversion.ofIR
+                | Structured -> StructuredXML.parseDocument text
+                | Sample -> failwith "unreachable"
 
-        match docResult with
-        | Error err ->
-            Style.error $"failed to parse xml: {err}"
-            Style.dimLine $"  source: {source}"
-            1
-        | Ok doc ->
-            let rendered = Render.renderDocument doc
-            writeOutput cmd.Target rendered
-            0
+            match docResult with
+            | Error err ->
+                Style.error $"failed to parse xml: {err}"
+                Style.dimLine $"  source: {source}"
+                1
+            | Ok doc ->
+                let rendered = Render.renderDocument doc
+                writeOutput cmd.Target cmd.Pretty Style.Palette.lightLavender rendered
+                0
 
 let tryParseConversionCommand (args: string list) =
-    let rec parseArgs input out debug remaining =
+    let rec parseArgs input out mode lossy sampleNs pretty remaining =
         match remaining with
         | [] ->
             match input with
-            | Some inp -> Ok(inp, out, debug)
-            | None when Console.IsInputRedirected -> Ok("-", out, debug)
+            | Some inp -> Ok(inp, out, mode, lossy, sampleNs, pretty)
+            | None when Console.IsInputRedirected -> Ok("-", out, mode, lossy, sampleNs, pretty)
             | None -> Error "conversion commands require an input path or '-' for stdin"
-        | "--out" :: path :: tail -> parseArgs input (Some path) debug tail
+        | "--out" :: path :: tail -> parseArgs input (Some path) mode lossy sampleNs pretty tail
         | "--out" :: [] -> Error "--out flag requires a path"
-        | "--debug" :: tail -> parseArgs input out true tail
+        | "--debug" :: tail ->
+            match mode with
+            | Some Sample -> Error "cannot combine --debug with --sample"
+            | _ -> parseArgs input out (Some Debug) lossy sampleNs pretty tail
+        | "--sample" :: tail ->
+            match mode with
+            | Some Debug -> Error "cannot combine --sample with --debug"
+            | _ -> parseArgs input out (Some Sample) lossy sampleNs pretty tail
+        | "--sample-ns" :: uri :: tail -> parseArgs input out mode lossy (Some uri) pretty tail
+        | "--sample-ns" :: [] -> Error "--sample-ns flag requires a namespace URI"
+        | "--lossy" :: tail -> parseArgs input out mode true sampleNs pretty tail
+        | "--pretty" :: tail -> parseArgs input out mode lossy sampleNs true tail
         | opt :: _ when opt.StartsWith("--") -> Error $"unknown option: {opt}"
         | value :: tail ->
             match input with
-            | None -> parseArgs (Some value) out debug tail
+            | None -> parseArgs (Some value) out mode lossy sampleNs pretty tail
             | Some _ -> Error $"unexpected argument: {value}"
 
     match args with
@@ -303,14 +374,32 @@ let tryParseConversionCommand (args: string list) =
 
         kindOpt
         |> Option.map (fun kind ->
-            parseArgs None None false rest
-            |> Result.map (fun (input, outOpt, debug) ->
-                let target = outOpt |> Option.map File |> Option.defaultValue Stdout
+            match parseArgs None None None false None false rest with
+            | Error e -> Error e
+            | Ok(input, outOpt, modeOpt, lossy, sampleNs, pretty) ->
+                let resolvedMode = modeOpt |> Option.defaultValue Structured
 
-                { Kind = kind
-                  Input = input
-                  Target = target
-                  DebugIR = debug }))
+                match sampleNs, resolvedMode, kind with
+                | Some _, Sample, KdlToXml ->
+                    Ok
+                        { Kind = kind
+                          Input = input
+                          Target = outOpt |> Option.map File |> Option.defaultValue Stdout
+                          Mode = resolvedMode
+                          Pretty = pretty
+                          Lossy = lossy
+                          SampleNamespace = sampleNs }
+                | Some _, _, KdlToXml -> Error "--sample-ns requires --sample mode"
+                | Some _, _, _ -> Error "--sample-ns is only valid with kdl-to-xml"
+                | None, _, _ ->
+                    Ok
+                        { Kind = kind
+                          Input = input
+                          Target = outOpt |> Option.map File |> Option.defaultValue Stdout
+                          Mode = resolvedMode
+                          Pretty = pretty
+                          Lossy = lossy
+                          SampleNamespace = None })
     | [] -> None
 
 let readInput argv =
